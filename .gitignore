@@ -1,0 +1,5 @@
+.DS_Store
+Orbeat.app/
+ios/build/
+ios/Orbeat.xcodeproj/project.xcworkspace/xcuserdata/
+*.png

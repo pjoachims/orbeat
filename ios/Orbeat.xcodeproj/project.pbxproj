@@ -1,0 +1,459 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3067A528D85A2BFCC66EDADE /* OrbeatActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */; };
+		38C70DFEF919890FC67F5C27 /* Bluetooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20AFD8421951BE412E289CAB /* Bluetooth.swift */; };
+		3F300C97BF5FC11B0A4BBA5E /* OrbeatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */; };
+		5AF8C6C5667ED1ADA944C7DE /* HeartRate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1133B536C9DB3960CC871E47 /* HeartRate.swift */; };
+		612DB140873E6E5CBD3FDC6E /* OrbeatWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		647B10E7C31D20C4810AE554 /* Rebroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCC29D707584EB83C39B118 /* Rebroadcast.swift */; };
+		6E2AF45C2641FCD83481484D /* OrbeatActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */; };
+		760B187D4989F076873DD268 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */; };
+		C7C193F6C811290BB653AD76 /* OrbeatWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D18B526DA33C2A14775665 /* OrbeatWidget.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		056E7BF224D218687579A7CA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4771F4CBCE02DBD6EEB91122 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C6A0D3DD9A978650F9DDC6E8;
+			remoteInfo = OrbeatWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		615F61658FCD2D29478BBCF2 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				612DB140873E6E5CBD3FDC6E /* OrbeatWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatActivity.swift; sourceTree = "<group>"; };
+		1133B536C9DB3960CC871E47 /* HeartRate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartRate.swift; sourceTree = "<group>"; };
+		20AFD8421951BE412E289CAB /* Bluetooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bluetooth.swift; sourceTree = "<group>"; };
+		3CCC29D707584EB83C39B118 /* Rebroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rebroadcast.swift; sourceTree = "<group>"; };
+		646A37EDB88E069642C3DD00 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = OrbeatWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		806A07E289E5372800293336 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A2FE9D0D9784B3C47AC38764 /* Orbeat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Orbeat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatApp.swift; sourceTree = "<group>"; };
+		F1D18B526DA33C2A14775665 /* OrbeatWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatWidget.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0F7818FD0905C4CEE345D9BB /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				20AFD8421951BE412E289CAB /* Bluetooth.swift */,
+				1133B536C9DB3960CC871E47 /* HeartRate.swift */,
+				3CCC29D707584EB83C39B118 /* Rebroadcast.swift */,
+			);
+			name = Sources;
+			path = ../Sources;
+			sourceTree = "<group>";
+		};
+		51C27E04703BDCF7E371675B /* App */ = {
+			isa = PBXGroup;
+			children = (
+				73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */,
+				646A37EDB88E069642C3DD00 /* Info.plist */,
+				C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		6696BD9BD26338E6E9F22845 = {
+			isa = PBXGroup;
+			children = (
+				51C27E04703BDCF7E371675B /* App */,
+				BD2B9080708B7A21A5E2AF6E /* Shared */,
+				0F7818FD0905C4CEE345D9BB /* Sources */,
+				92571719749A1214694565C6 /* Widget */,
+				AE557A3DB3AE962934C2DBA6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		92571719749A1214694565C6 /* Widget */ = {
+			isa = PBXGroup;
+			children = (
+				806A07E289E5372800293336 /* Info.plist */,
+				F1D18B526DA33C2A14775665 /* OrbeatWidget.swift */,
+			);
+			path = Widget;
+			sourceTree = "<group>";
+		};
+		AE557A3DB3AE962934C2DBA6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2FE9D0D9784B3C47AC38764 /* Orbeat.app */,
+				6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		BD2B9080708B7A21A5E2AF6E /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C6A0D3DD9A978650F9DDC6E8 /* OrbeatWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 20D324CA9EB2F556B7A703CA /* Build configuration list for PBXNativeTarget "OrbeatWidget" */;
+			buildPhases = (
+				4C39D75073C5ABA6F0D7E9C5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OrbeatWidget;
+			packageProductDependencies = (
+			);
+			productName = OrbeatWidget;
+			productReference = 6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		EF7E16DB40868418CD16A024 /* Orbeat */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 15413F322C6003F4338D3653 /* Build configuration list for PBXNativeTarget "Orbeat" */;
+			buildPhases = (
+				059FE89D9DD6D9D53ACA9106 /* Sources */,
+				1707E83CB14395DF65CB8681 /* Resources */,
+				615F61658FCD2D29478BBCF2 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6DA7DBA1D624ED72912F8EB9 /* PBXTargetDependency */,
+			);
+			name = Orbeat;
+			packageProductDependencies = (
+			);
+			productName = Orbeat;
+			productReference = A2FE9D0D9784B3C47AC38764 /* Orbeat.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4771F4CBCE02DBD6EEB91122 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					C6A0D3DD9A978650F9DDC6E8 = {
+						DevelopmentTeam = UVB62X4VVB;
+						ProvisioningStyle = Automatic;
+					};
+					EF7E16DB40868418CD16A024 = {
+						DevelopmentTeam = UVB62X4VVB;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 60ED6C2F22785B190304E660 /* Build configuration list for PBXProject "Orbeat" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 6696BD9BD26338E6E9F22845;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = AE557A3DB3AE962934C2DBA6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EF7E16DB40868418CD16A024 /* Orbeat */,
+				C6A0D3DD9A978650F9DDC6E8 /* OrbeatWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1707E83CB14395DF65CB8681 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				760B187D4989F076873DD268 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		059FE89D9DD6D9D53ACA9106 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				38C70DFEF919890FC67F5C27 /* Bluetooth.swift in Sources */,
+				5AF8C6C5667ED1ADA944C7DE /* HeartRate.swift in Sources */,
+				6E2AF45C2641FCD83481484D /* OrbeatActivity.swift in Sources */,
+				3F300C97BF5FC11B0A4BBA5E /* OrbeatApp.swift in Sources */,
+				647B10E7C31D20C4810AE554 /* Rebroadcast.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4C39D75073C5ABA6F0D7E9C5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3067A528D85A2BFCC66EDADE /* OrbeatActivity.swift in Sources */,
+				C7C193F6C811290BB653AD76 /* OrbeatWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6DA7DBA1D624ED72912F8EB9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C6A0D3DD9A978650F9DDC6E8 /* OrbeatWidget */;
+			targetProxy = 056E7BF224D218687579A7CA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		35561A07462C0746AD371505 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vibecode.orbeat.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		48D582C2E5537EE91439498D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = UVB62X4VVB;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		534D2646F25618634D00C263 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Widget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vibecode.orbeat.ios.widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		53BAC207B857D9F68C03771A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = UVB62X4VVB;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		5A5CD28DAE368A75ACC0350F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = Widget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vibecode.orbeat.ios.widget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B5DDAC78D44BB99CBEA4DD92 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vibecode.orbeat.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		15413F322C6003F4338D3653 /* Build configuration list for PBXNativeTarget "Orbeat" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				35561A07462C0746AD371505 /* Debug */,
+				B5DDAC78D44BB99CBEA4DD92 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		20D324CA9EB2F556B7A703CA /* Build configuration list for PBXNativeTarget "OrbeatWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A5CD28DAE368A75ACC0350F /* Debug */,
+				534D2646F25618634D00C263 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		60ED6C2F22785B190304E660 /* Build configuration list for PBXProject "Orbeat" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				48D582C2E5537EE91439498D /* Debug */,
+				53BAC207B857D9F68C03771A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4771F4CBCE02DBD6EEB91122 /* Project object */;
+}
