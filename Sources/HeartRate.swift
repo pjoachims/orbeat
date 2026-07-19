@@ -20,11 +20,19 @@ final class HeartRate: ObservableObject {
     @Published var minBPM: Int = 0
     @Published var maxBPM: Int = 0
     let restingBPM: Int = 58
+    /// Hide a metric once its own sensor has been silent this long.
+    static let staleAfter: TimeInterval = 60
+
     @Published var lastSync: Date = .distantPast
-    /// True while the newest reading (any metric) is < 60 s old (matches the
-    /// Live Activity staleDate). Timer-driven so the UI goes stale even when
-    /// no new data arrives to trigger a render.
+    /// True while the newest *heart-rate* reading is < `staleAfter` old.
+    /// Per-metric on purpose: a power meter that keeps streaming must not keep
+    /// a dead strap's BPM on screen. Timer-driven so the UI goes stale even
+    /// when no new data arrives to trigger a render.
     @Published private(set) var isFresh = false
+    /// Same, for the power meter's metrics (watts/cadence/speed).
+    @Published private(set) var powerFresh = false
+    private var lastHRSync: Date = .distantPast
+    private var lastPowerSync: Date = .distantPast
     @Published var sourceName: String = "Simulated"
     @Published var bleStatus: String = "Starting…"
     /// Alert threshold in BPM; 0 = off. Persisted.
@@ -58,8 +66,10 @@ final class HeartRate: ObservableObject {
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self else { return }
-                let f = Date().timeIntervalSince(self.lastSync) < 60
+                let f = Date().timeIntervalSince(self.lastHRSync) < HeartRate.staleAfter
                 if f != self.isFresh { self.isFresh = f }
+                let p = Date().timeIntervalSince(self.lastPowerSync) < HeartRate.staleAfter
+                if p != self.powerFresh { self.powerFresh = p }
             }
         if HeartRate.simulated {
             let now = Date()
@@ -74,15 +84,15 @@ final class HeartRate: ObservableObject {
     /// True once any reading (real or simulated) has arrived.
     var hasData: Bool { !history.isEmpty }
     var bpmText: String { hasData && isFresh ? "\(bpm)" : "––" }
-    // Stale (>120 s) reads as no value everywhere these are shown.
-    var displayWatts: Int? { isFresh ? watts : nil }
-    var displayCadence: Int? { isFresh ? cadence : nil }
-    var displaySpeedKmh: Double? { isFresh ? speedKmh : nil }
+    // Stale reads as no value everywhere these are shown.
+    var displayWatts: Int? { powerFresh ? watts : nil }
+    var displayCadence: Int? { powerFresh ? cadence : nil }
+    var displaySpeedKmh: Double? { powerFresh ? speedKmh : nil }
 
-    /// Mark a live reading as just received (any metric).
-    // isFresh first: @Published emits on willSet, and the iOS app pushes a Live
-    // Activity update from $lastSync — it must see isFresh already true.
-    func touch() { isFresh = true; lastSync = Date() }
+    /// Mark a live power-meter reading as just received.
+    // Freshness first: @Published emits on willSet, and the iOS app pushes a
+    // Live Activity update from $lastSync — it must see freshness already set.
+    func touch() { powerFresh = true; lastPowerSync = Date(); lastSync = Date() }
 
     func start() {
         timer = Timer.publish(every: 1.1, on: .main, in: .common)
@@ -115,7 +125,7 @@ final class HeartRate: ObservableObject {
         if history.count > 60 { history.removeFirst(history.count - 60) }
         minBPM = first ? b : min(minBPM, b)
         maxBPM = first ? b : max(maxBPM, b)
-        touch()
+        isFresh = true; lastHRSync = Date(); lastSync = Date()
     }
 
     /// Heart-rate zone matching the design's `zoneFor`.

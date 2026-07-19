@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Refresh the menu-bar title whenever any displayed metric ticks.
         bpmObserver = hr.$bpm.combineLatest(hr.$watts, hr.$cadence, hr.$speedKmh)
-            .combineLatest(hr.$isFresh)
+            .combineLatest(hr.$isFresh, hr.$powerFresh)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.updateStatusTitle() }
             } as AnyObject

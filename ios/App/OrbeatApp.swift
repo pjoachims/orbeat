@@ -102,7 +102,7 @@ struct ContentView: View {
             guard let a = activity,
                   Date().timeIntervalSince(lastActivityPush) >= 2 else { return }
             lastActivityPush = Date()
-            let content = ActivityContent(state: state, staleDate: .now + 60)
+            let content = ActivityContent(state: state, staleDate: .now + HeartRate.staleAfter)
             Task { await a.update(content) }
         }
         // Recreate after the user swiped the island away — the old handle keeps
@@ -137,7 +137,7 @@ struct ContentView: View {
         }
         activity = adopted ?? (try? Activity.request(
             attributes: OrbeatAttributes(),
-            content: .init(state: state, staleDate: .now + 60)))
+            content: .init(state: state, staleDate: .now + HeartRate.staleAfter)))
     }
 
     private func endActivity() {
