@@ -203,7 +203,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             guard bytes.count >= 4 else { return }
             let flags = UInt16(bytes[0]) | (UInt16(bytes[1]) << 8)
             model?.watts = Int(Int16(bitPattern: UInt16(bytes[2]) | (UInt16(bytes[3]) << 8)))
-            model?.touch()   // power packets count as a sync too
+            model?.touch(.power)
             var i = 4
             if flags & 0x0001 != 0 { i += 1 }   // pedal power balance
             if flags & 0x0004 != 0 { i += 2 }   // accumulated torque
