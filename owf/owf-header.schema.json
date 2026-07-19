@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/perjoachims/orbeat/owf/owf-header.schema.json",
+  "title": "OWF header line (v0.1)",
+  "type": "object",
+  "required": ["owf", "start", "channels"],
+  "properties": {
+    "owf": { "const": "0.1" },
+    "start": { "type": "string", "format": "date-time" },
+    "channels": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "sport": { "type": "string" },
+    "source": {
+      "type": "object",
+      "properties": {
+        "app": { "type": "string" },
+        "device": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "patternProperties": {
+    "^x-": {}
+  },
+  "additionalProperties": false
+}
