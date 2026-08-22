@@ -9,18 +9,10 @@ import CoreBluetooth
 ///
 /// Self-contained component: it knows nothing about the UI model or app
 /// policies. It logs every raw packet through the injected `LogWriting` sink
-/// and reports decoded results upward as `BLEEvent`s via `onEvent`.
+/// and reports decoded results upward as `SensorEvent`s via `onEvent`.
 final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     /// Decoded events for the app layer (set before scanning starts).
-    var onEvent: ((BLEEvent) -> Void)?
-
-    private let hrService = CBUUID(string: "180D")
-    private let hrMeasurement = CBUUID(string: "2A37")
-    private let powerService = CBUUID(string: "1818")
-    private let powerMeasurement = CBUUID(string: "2A63")
-    /// FTMS Indoor Bike Data — fallback telemetry source for trainers without
-    /// a Cycling Power Service.
-    private let ftmsIndoorBikeData = CBUUID(string: "2AD2")
+    var onEvent: ((SensorEvent) -> Void)?
 
     struct Device {
         let peripheral: CBPeripheral
@@ -48,21 +40,33 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     /// Devices the user has connected before — only these auto-connect.
     private var known: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "knownDevices") ?? [])
 
-    // Packet decoding (same component): pure parsers keep rev-delta state.
-    private let ride = ZwiftRideController()
+    private let heartDriver: HeartRateDriver
+    private let powerDriver: PowerDriver
+    private let drivers: [EquipmentDriver]
+    private let buttonDecode = ZwiftRideController()
     private let trainer = Trainer()
-    private let powerParser = CyclingPowerParser()
-    /// Peripherals whose power data arrives via the Cycling Power Service;
-    /// their FTMS stream is ignored (no rev counters, redundant watts).
-    private var cpsDevices = Set<UUID>()
 
-    private func emit(_ event: BLEEvent) { onEvent?(event) }
+    private func emit(_ event: SensorEvent) { onEvent?(event) }
     private func log(_ fields: [String: Any]) { logSink?.log(fields) }
 
     /// Best-known name for a peripheral — advertisement name as fallback,
     /// mirroring Device.name (some devices never set peripheral.name).
     private func deviceName(_ p: CBPeripheral) -> String? {
         p.name ?? discovered.first { $0.peripheral.identifier == p.identifier }?.advName
+    }
+
+    private func unique(_ uuids: [CBUUID]) -> [CBUUID] {
+        var out: [CBUUID] = []
+        for uuid in uuids where !out.contains(uuid) { out.append(uuid) }
+        return out
+    }
+
+    private var scanServices: [CBUUID] {
+        unique(drivers.flatMap { $0.scannedServices } + [ZwiftRideController.service])
+    }
+
+    private var discoveryServices: [CBUUID] {
+        unique(drivers.flatMap { $0.scannedServices } + [Trainer.service, ZwiftRideController.service])
     }
 
     func isConnected(_ d: Device) -> Bool { d.peripheral.state == .connected }
@@ -99,7 +103,14 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
 
     init(log: (any LogWriting)? = nil) {
         self.logSink = log
+        var lookup: ((CBPeripheral) -> String?)?
+        let heartDriver = HeartRateDriver(log: log, deviceName: { lookup?($0) })
+        let powerDriver = PowerDriver(log: log, deviceName: { lookup?($0) })
+        self.heartDriver = heartDriver
+        self.powerDriver = powerDriver
+        self.drivers = [heartDriver, powerDriver]
         super.init()
+        lookup = { [weak self] peripheral in self?.deviceName(peripheral) }
         central = CBCentralManager(delegate: self, queue: .main,
                                    options: [CBCentralManagerOptionShowPowerAlertKey: true])
     }
@@ -118,7 +129,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     private func scan() {
         guard central.state == .poweredOn else { return }
         central.scanForPeripherals(
-            withServices: scanningAll ? nil : [hrService, powerService, ZwiftRideController.service])
+            withServices: scanningAll ? nil : scanServices)
     }
 
     // MARK: Central lifecycle
@@ -145,10 +156,10 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         // advertisementData often omits it — fall back to the name.
         let nameHit = (peripheral.name ?? advName ?? "").localizedCaseInsensitiveContains("zwift")
         let isRide = advertised.contains(ZwiftRideController.service) || nameHit
-        let isPower = advertised.contains(powerService) && !advertised.contains(hrService)
+        let isPower = powerDriver.matches(peripheral.name ?? advName, advertisedServices: advertised)
         // Filtered scans imply a sensor even when the callback omits the service list.
-        let isSensor = !scanningAll || advertised.contains(hrService)
-            || advertised.contains(powerService) || isRide
+        let isSensor = !scanningAll || advertised.contains(HeartRateDriver.hrService)
+            || advertised.contains(PowerDriver.powerService) || isRide
         if !isSensor && peripheral.name == nil && advName == nil { return }   // skip anonymous junk in search-all
         if !discovered.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
             discovered.append(Device(peripheral: peripheral, isPower: isPower, isRide: isRide,
@@ -169,7 +180,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         log(["src": "ble", "ev": "connected", "name": peripheral.name ?? "?",
              "ride": peripheral === ridePeripheral])
-        peripheral.discoverServices([hrService, powerService, Trainer.service, ZwiftRideController.service])
+        peripheral.discoverServices(discoveryServices)
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral,
@@ -187,15 +198,14 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         }
         if peripheral === powerPeripheral {
             powerPeripheral = nil
-            cpsDevices.remove(peripheral.identifier)
-            powerParser.reset()
+            powerDriver.reset(for: peripheral)
             trainer.detach()
             emit(.trainerLost)
             emit(.powerLinkDown)
         }
         if peripheral === ridePeripheral {
             ridePeripheral = nil
-            ride.reset()
+            buttonDecode.reset()
         }
         log(["src": "ble", "ev": "disconnected", "name": peripheral.name ?? "?",
              "err": error?.localizedDescription ?? ""])
@@ -209,17 +219,15 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
              "uuids": (peripheral.services ?? []).map { $0.uuid.uuidString },
              "err": error?.localizedDescription ?? ""])
         peripheral.services?.forEach { svc in
-            if svc.uuid == hrService {
-                peripheral.discoverCharacteristics([hrMeasurement], for: svc)
-            }
-            if svc.uuid == powerService {
-                peripheral.discoverCharacteristics([powerMeasurement], for: svc)
-            }
+            var chars: [CBUUID] = []
             if svc.uuid == Trainer.service {
-                peripheral.discoverCharacteristics([Trainer.controlPoint, ftmsIndoorBikeData], for: svc)
+                chars.append(Trainer.controlPoint)
             }
+            chars.append(contentsOf: drivers.flatMap { $0.notifyCharacteristics(forService: svc.uuid) })
             if svc.uuid == ZwiftRideController.service {
                 peripheral.discoverCharacteristics(nil, for: svc)   // discover all, incl. 0006
+            } else if !chars.isEmpty {
+                peripheral.discoverCharacteristics(unique(chars), for: svc)
             }
         }
     }
@@ -227,23 +235,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService,
                     error: Error?) {
         service.characteristics?.forEach { ch in
-            if ch.uuid == hrMeasurement {
-                peripheral.setNotifyValue(true, for: ch)
-                emit(.heartLinkUp(device: peripheral.name ?? "BLE device"))
-            }
-            if ch.uuid == powerMeasurement {
-                peripheral.setNotifyValue(true, for: ch)
-                cpsDevices.insert(peripheral.identifier)
-                emit(.powerLinkUp(device: peripheral.name ?? "Power meter"))
-            }
-            if ch.uuid == ftmsIndoorBikeData {
-                if ch.properties.contains(.notify) {
-                    peripheral.setNotifyValue(true, for: ch)
-                    if !cpsDevices.contains(peripheral.identifier) {
-                        emit(.powerLinkUp(device: peripheral.name ?? "Trainer"))
-                    }
-                }
-            }
+            drivers.flatMap { $0.characteristicDiscovered(peripheral, ch) }.forEach(emit)
             if ch.uuid == Trainer.controlPoint {
                 trainer.attach(peripheral, control: ch)
                 emit(.trainerReady)
@@ -312,7 +304,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
                  "raw": bytes.map { String(format: "%02x", $0) }.joined()]
             if let n = deviceName(peripheral) { ev["device"] = n }
             log(ev)
-            guard let frame = ride.handle(bytes) else { return }
+            guard let frame = buttonDecode.handle(bytes) else { return }
             // Translate the proprietary bitmap into neutral intents for Core.
             var inputs: [HandlebarInput] = []
             if frame.newlyPressed.contains(where: { $0 & ZwiftButtonFrame.shiftUp != 0 }) {
@@ -326,28 +318,21 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
                                          "pressed": frame.pressed]
             if let n = deviceName(peripheral) { rideEv["device"] = n }
             log(rideEv)
-        case hrMeasurement:
+        case HeartRateDriver.hrMeasurement:
             // Only the HR-slot device; a rebroadcast bridge in the power slot
             // could expose HR too and double-feed the model.
             guard peripheral === hrPeripheral else { return }
             rebroadcaster.relay(data, isPower: false)
-            guard let reading = HeartRateParser.parse(bytes, device: deviceName(peripheral)) else { return }
-            log(HeartRateParser.logFields(reading))
-            emit(.heartRate(reading))
-        case powerMeasurement:
+            heartDriver.handle(peripheral, characteristic, bytes).forEach(emit)
+        case PowerDriver.powerMeasurement:
             // Only the power-slot device; two sources interleaving here would
             // corrupt the parser's cumulative rev counters → speed/cadence spikes.
             guard peripheral === powerPeripheral else { return }
             rebroadcaster.relay(data, isPower: true)
-            guard let packet = powerParser.parse(bytes, device: deviceName(peripheral)) else { return }
-            log(packet.logFields)
-            emit(.power(packet.reading))
-        case ftmsIndoorBikeData:
+            powerDriver.handle(peripheral, characteristic, bytes).forEach(emit)
+        case PowerDriver.ftmsIndoorBikeData:
             guard peripheral === powerPeripheral else { return }
-            guard !cpsDevices.contains(peripheral.identifier) else { return }
-            guard let packet = FtmsIndoorBikeParser.parse(bytes, device: deviceName(peripheral)) else { return }
-            log(packet.logFields)
-            if let reading = packet.reading { emit(.power(reading)) }
+            powerDriver.handle(peripheral, characteristic, bytes).forEach(emit)
         default:
             break
         }

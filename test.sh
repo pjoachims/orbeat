@@ -9,14 +9,15 @@ OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 
 swiftc -O \
-  Sources/Core/Sensors.swift \
+  Sources/Core/Readings.swift \
+  Sources/Core/SensorEvent.swift \
   Sources/Core/TrainerMode.swift \
   Sources/Core/RideButtons.swift \
   Sources/Drivers/Standard/CyclingPower.swift \
   Sources/Drivers/Standard/FtmsIndoorBike.swift \
   Sources/Drivers/Standard/HeartRateParse.swift \
   Sources/Drivers/Zwift/ZwiftButtonFrame.swift \
-  Sources/Drivers/Zwift/ZwiftRideController.swift \
+  Sources/Drivers/Zwift/ButtonDecoder.swift \
   Tests/Harness.swift \
   Tests/ErgsTests.swift \
   Tests/TrainerModeTests.swift \

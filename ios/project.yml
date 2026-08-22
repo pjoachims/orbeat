@@ -16,6 +16,7 @@ targets:
       - App
       - Shared
       - path: ../Sources/Core
+      - path: ../Sources/Model
       - path: ../Sources/Ble
       - path: ../Sources/Drivers
     dependencies:

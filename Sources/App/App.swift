@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: BLE event routing (the only place the component meets the model)
 
-    private func handle(_ event: BLEEvent) {
+    private func handle(_ event: SensorEvent) {
         switch event {
         case .status(let s):
             model.bleStatus = s

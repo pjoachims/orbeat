@@ -1,5 +1,6 @@
 import CoreBluetooth
 
+// Control point is command-out, not a telemetry driver.
 /// Controls an FTMS trainer (Wahoo KICKR etc.) over the Fitness Machine Service.
 /// Supports the three standard control targets via `TrainerMode`:
 /// - ERG (`0x05` set target power) — trainer holds constant watts

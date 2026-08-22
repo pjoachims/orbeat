@@ -37,7 +37,7 @@ struct ContentView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 34))
-                        .foregroundStyle(model.zoneColor)
+                        .foregroundStyle(orbeatZoneColor(model.bpm))
                     Text(model.bpmText)
                         .font(.system(size: 76, weight: .bold, design: .rounded))
                         .monospacedDigit()
@@ -194,7 +194,7 @@ struct ContentView: View {
     }
 
     /// Map component events onto the shared model (composition root).
-    private func apply(_ event: BLEEvent, to model: RideModel) {
+    private func apply(_ event: SensorEvent, to model: RideModel) {
         switch event {
         case .status(let s): model.bleStatus = s
         case .heartLinkUp(let device): model.setLive(true, source: device)

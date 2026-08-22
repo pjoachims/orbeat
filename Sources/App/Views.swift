@@ -2,6 +2,16 @@ import SwiftUI
 
 let orbeatRed = Color(red: 1.0, green: 0.22, blue: 0.37)   // #FF375F
 
+/// Zone color for a BPM value (was RideModel.zoneColor).
+func rideZoneColor(_ bpm: Int) -> Color {
+    switch bpm {
+    case ..<60: return Color(red: 0.18, green: 0.82, blue: 0.35)   // green
+    case ..<100: return Color(red: 1.0, green: 0.62, blue: 0.04)   // orange
+    case ..<140: return Color(red: 1.0, green: 0.22, blue: 0.37)   // red
+    default: return Color(red: 0.74, green: 0.35, blue: 0.95)      // purple
+    }
+}
+
 /// Animated beating heart glyph.
 struct BeatingHeart: View {
     var size: CGFloat = 13
@@ -219,7 +229,7 @@ struct HeartCard: View {
             // footer
             HStack {
                 HStack(spacing: 6) {
-                    Circle().fill(model.hasData && model.isFresh ? model.zoneColor : .secondary)
+                    Circle().fill(model.hasData && model.isFresh ? rideZoneColor(model.bpm) : .secondary)
                         .frame(width: 6, height: 6)
                     Text(model.hasData ? (model.isFresh ? model.zone : "Signal lost") : "No device")
                         .font(.system(size: 11, weight: .semibold))

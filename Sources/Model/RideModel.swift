@@ -1,10 +1,10 @@
-import SwiftUI
+import Foundation
 import Combine
 
 /// Ride model: the single observable UI state shared by every platform —
 /// heart rate plus power, cadence, speed and trainer grade.
 ///
-/// Components never write into it directly; the app layer maps BLEEvent
+/// Components never write into it directly; the app layer maps SensorEvent
 /// values onto it. `ingest`/`touch`/`setLive` are its only inputs.
 final class RideModel: ObservableObject {
     /// Master switch for the fake signal. Off → only real BLE data drives the UI.
@@ -136,15 +136,6 @@ final class RideModel: ObservableObject {
         case ..<100: return "Fat Burn"
         case ..<140: return "Cardio"
         default: return "Peak"
-        }
-    }
-
-    var zoneColor: Color {
-        switch bpm {
-        case ..<60: return Color(red: 0.18, green: 0.82, blue: 0.35)   // green
-        case ..<100: return Color(red: 1.0, green: 0.62, blue: 0.04)   // orange
-        case ..<140: return Color(red: 1.0, green: 0.22, blue: 0.37)   // red
-        default: return Color(red: 0.74, green: 0.35, blue: 0.95)      // purple
         }
     }
 
