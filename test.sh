@@ -12,11 +12,11 @@ swiftc -O \
   Sources/Core/Sensors.swift \
   Sources/Core/TrainerMode.swift \
   Sources/Core/RideButtons.swift \
-  Sources/Components/Ergs/CyclingPower.swift \
-  Sources/Components/Ergs/FtmsIndoorBike.swift \
-  Sources/Components/HeartRate/HeartRateParse.swift \
-  Sources/Components/BLE/Zwift/ZwiftButtonFrame.swift \
-  Sources/Components/BLE/Zwift/ZwiftRideController.swift \
+  Sources/Drivers/Standard/CyclingPower.swift \
+  Sources/Drivers/Standard/FtmsIndoorBike.swift \
+  Sources/Drivers/Standard/HeartRateParse.swift \
+  Sources/Drivers/Zwift/ZwiftButtonFrame.swift \
+  Sources/Drivers/Zwift/ZwiftRideController.swift \
   Tests/Harness.swift \
   Tests/ErgsTests.swift \
   Tests/TrainerModeTests.swift \

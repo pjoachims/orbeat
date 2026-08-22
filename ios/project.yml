@@ -16,9 +16,8 @@ targets:
       - App
       - Shared
       - path: ../Sources/Core
-      - path: ../Sources/Components/BLE
-      - path: ../Sources/Components/Ergs
-      - path: ../Sources/Components/HeartRate
+      - path: ../Sources/Ble
+      - path: ../Sources/Drivers
     dependencies:
       - target: OrbeatWidget
     info:
