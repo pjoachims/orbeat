@@ -45,6 +45,9 @@ final class RideModel: ObservableObject {
     }
     /// True once a controllable trainer (FTMS control point) is connected.
     @Published var trainerControllable = false
+    /// Current trainer control target (ERG watts / resistance / sim grade);
+    /// nil until a connected trainer accepts its first target.
+    @Published var trainerMode: TrainerMode?
     /// Metrics shown in the menu bar: any of "heart", "power", "rpm", "speed". Persisted.
     @Published var barMetrics: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: "barMetrics") ?? ["heart"]) {

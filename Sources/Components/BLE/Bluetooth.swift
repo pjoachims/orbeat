@@ -18,6 +18,9 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     private let hrMeasurement = CBUUID(string: "2A37")
     private let powerService = CBUUID(string: "1818")
     private let powerMeasurement = CBUUID(string: "2A63")
+    /// FTMS Indoor Bike Data — fallback telemetry source for trainers without
+    /// a Cycling Power Service.
+    private let ftmsIndoorBikeData = CBUUID(string: "2AD2")
 
     struct Device {
         let peripheral: CBPeripheral
@@ -45,15 +48,13 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     /// Devices the user has connected before — only these auto-connect.
     private var known: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "knownDevices") ?? [])
 
-    // Previous cumulative rev counters, for cadence/speed deltas.
-    private var lastCrank: (revs: UInt16, time: UInt16)?
-    private var lastWheel: (revs: UInt32, time: UInt16)?
-    // ponytail: fixed 700x25c circumference (2.105 m); make it a setting if speed reads off
-    private let wheelCircumference = 2.105
-
-    // Transport collaborators (same component): trainer control + button decode.
+    // Packet decoding (same component): pure parsers keep rev-delta state.
     private let ride = ZwiftRideController()
     private let trainer = Trainer()
+    private let powerParser = CyclingPowerParser()
+    /// Peripherals whose power data arrives via the Cycling Power Service;
+    /// their FTMS stream is ignored (no rev counters, redundant watts).
+    private var cpsDevices = Set<UUID>()
 
     private func emit(_ event: BLEEvent) { onEvent?(event) }
     private func log(_ fields: [String: Any]) { logSink?.log(fields) }
@@ -186,8 +187,8 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         }
         if peripheral === powerPeripheral {
             powerPeripheral = nil
-            lastCrank = nil
-            lastWheel = nil
+            cpsDevices.remove(peripheral.identifier)
+            powerParser.reset()
             trainer.detach()
             emit(.trainerLost)
             emit(.powerLinkDown)
@@ -215,7 +216,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
                 peripheral.discoverCharacteristics([powerMeasurement], for: svc)
             }
             if svc.uuid == Trainer.service {
-                peripheral.discoverCharacteristics([Trainer.controlPoint], for: svc)
+                peripheral.discoverCharacteristics([Trainer.controlPoint, ftmsIndoorBikeData], for: svc)
             }
             if svc.uuid == ZwiftRideController.service {
                 peripheral.discoverCharacteristics(nil, for: svc)   // discover all, incl. 0006
@@ -232,7 +233,16 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             }
             if ch.uuid == powerMeasurement {
                 peripheral.setNotifyValue(true, for: ch)
+                cpsDevices.insert(peripheral.identifier)
                 emit(.powerLinkUp(device: peripheral.name ?? "Power meter"))
+            }
+            if ch.uuid == ftmsIndoorBikeData {
+                if ch.properties.contains(.notify) {
+                    peripheral.setNotifyValue(true, for: ch)
+                    if !cpsDevices.contains(peripheral.identifier) {
+                        emit(.powerLinkUp(device: peripheral.name ?? "Trainer"))
+                    }
+                }
             }
             if ch.uuid == Trainer.controlPoint {
                 trainer.attach(peripheral, control: ch)
@@ -279,11 +289,11 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
              "err": error?.localizedDescription ?? ""])
     }
 
-    /// Push a sim grade (0.01% units) to the attached trainer. Returns the
-    /// applied (clamped) value so the caller can keep its state in sync.
+    /// Push a control target to the attached trainer. Returns the applied
+    /// (clamped) mode so the caller can keep its state in sync.
     @discardableResult
-    func setGrade(_ grade: Int) -> Int {
-        trainer.setGrade(grade)
+    func setTrainerMode(_ mode: TrainerMode) -> TrainerMode {
+        trainer.set(mode)
     }
 
     // MARK: Packet decode
@@ -315,119 +325,25 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             // could expose HR too and double-feed the model.
             guard peripheral === hrPeripheral else { return }
             rebroadcaster.relay(data, isPower: false)
-            emit(.heartRate(parseHeartRate(bytes, from: peripheral)))
+            guard let reading = HeartRateParser.parse(bytes, device: deviceName(peripheral)) else { return }
+            log(HeartRateParser.logFields(reading))
+            emit(.heartRate(reading))
         case powerMeasurement:
-            // Only the power-slot device; two sources interleaving here corrupt
-            // the cumulative rev counters (lastWheel/lastCrank) → speed/cadence spikes.
+            // Only the power-slot device; two sources interleaving here would
+            // corrupt the parser's cumulative rev counters → speed/cadence spikes.
             guard peripheral === powerPeripheral else { return }
             rebroadcaster.relay(data, isPower: true)
-            parsePower(bytes, from: peripheral)
+            guard let packet = powerParser.parse(bytes, device: deviceName(peripheral)) else { return }
+            log(packet.logFields)
+            emit(.power(packet.reading))
+        case ftmsIndoorBikeData:
+            guard peripheral === powerPeripheral else { return }
+            guard !cpsDevices.contains(peripheral.identifier) else { return }
+            guard let packet = FtmsIndoorBikeParser.parse(bytes, device: deviceName(peripheral)) else { return }
+            log(packet.logFields)
+            if let reading = packet.reading { emit(.power(reading)) }
         default:
             break
         }
-    }
-
-    /// Spec: byte0 flags; bit0 = value format (0 = UInt8, 1 = UInt16 LE),
-    /// bit1/2 = sensor contact, bit3 = energy expended, bit4 = RR intervals.
-    private func parseHeartRate(_ bytes: [UInt8], from peripheral: CBPeripheral) -> HeartRateReading {
-        let flags = bytes[0]
-        let bpm: Int
-        var i: Int
-        if (bytes.count >= 2) && (flags & 0x01) == 0 {
-            bpm = Int(bytes[1]); i = 2
-        } else if bytes.count >= 3 {
-            bpm = Int(bytes[1]) | (Int(bytes[2]) << 8); i = 3
-        } else {
-            return HeartRateReading(device: deviceName(peripheral), bpm: 0,
-                                    contact: nil, kj: nil, rrMs: nil)
-        }
-        var contact: Bool? = nil, kj: Int? = nil, rrMs: [Int]? = nil
-        if flags & 0x04 != 0 { contact = (flags & 0x02) != 0 }
-        if flags & 0x08 != 0, bytes.count >= i + 2 {   // energy expended, kJ
-            kj = Int(bytes[i]) | (Int(bytes[i+1]) << 8)
-            i += 2
-        }
-        if flags & 0x10 != 0 {   // RR intervals, u16 each, 1/1024 s
-            var rr: [Int] = []
-            while bytes.count >= i + 2 {
-                let v = Int(bytes[i]) | (Int(bytes[i+1]) << 8)
-                rr.append(Int((Double(v) / 1024.0 * 1000).rounded()))   // → ms
-                i += 2
-            }
-            if !rr.isEmpty { rrMs = rr }
-        }
-        var ev: [String: Any] = ["src": "hr", "bpm": bpm]
-        if let n = deviceName(peripheral) { ev["device"] = n }
-        if let c = contact { ev["contact"] = c }
-        if let k = kj { ev["kj"] = k }
-        if let r = rrMs { ev["rr_ms"] = r }
-        log(ev)
-        return HeartRateReading(device: deviceName(peripheral), bpm: bpm,
-                                contact: contact, kj: kj, rrMs: rrMs)
-    }
-
-    /// Spec: flags UInt16 LE, instantaneous power SInt16 LE, then optional
-    /// fields in flag-bit order. We care about wheel revs (bit4, speed)
-    /// and crank revs (bit5, cadence). Logs the full raw dict, emits typed.
-    private func parsePower(_ bytes: [UInt8], from peripheral: CBPeripheral) {
-        guard bytes.count >= 4 else { return }
-        let flags = UInt16(bytes[0]) | (UInt16(bytes[1]) << 8)
-        let watts = Int(Int16(bitPattern: UInt16(bytes[2]) | (UInt16(bytes[3]) << 8)))
-        var balancePct: Double? = nil, torqueNm: Double? = nil
-        var kmh: Double? = nil, rpm: Int? = nil
-        var wheelRevs: Int? = nil, wheelEvt: Int? = nil, crankRevs: Int? = nil, crankEvt: Int? = nil
-        var i = 4
-        if flags & 0x0001 != 0, bytes.count >= i + 1 {   // pedal power balance, 0.5 %
-            balancePct = Double(bytes[i]) / 2
-            i += 1
-        }
-        if flags & 0x0004 != 0, bytes.count >= i + 2 {   // accumulated torque, 1/32 Nm
-            torqueNm = Double(UInt16(bytes[i]) | (UInt16(bytes[i+1]) << 8)) / 32
-            i += 2
-        }
-        if flags & 0x0010 != 0, bytes.count >= i + 6 {   // wheel revolution data
-            let revs = UInt32(bytes[i]) | (UInt32(bytes[i+1]) << 8)
-                     | (UInt32(bytes[i+2]) << 16) | (UInt32(bytes[i+3]) << 24)
-            let t = UInt16(bytes[i+4]) | (UInt16(bytes[i+5]) << 8)   // 1/2048 s
-            if let last = lastWheel {
-                if t == last.time {
-                    kmh = 0   // wheel stopped: no new event
-                } else {
-                    let dt = Double(t &- last.time) / 2048.0
-                    kmh = Double(revs &- last.revs) * wheelCircumference / dt * 3.6
-                }
-            }
-            wheelRevs = Int(revs); wheelEvt = Int(t)
-            lastWheel = (revs, t)
-            i += 6
-        }
-        if flags & 0x0020 != 0, bytes.count >= i + 4 {   // crank revolution data
-            let revs = UInt16(bytes[i]) | (UInt16(bytes[i+1]) << 8)
-            let t = UInt16(bytes[i+2]) | (UInt16(bytes[i+3]) << 8)   // 1/1024 s
-            if let last = lastCrank {
-                if t == last.time {
-                    rpm = 0   // coasting: no new crank event
-                } else {
-                    let dt = Double(t &- last.time) / 1024.0
-                    rpm = Int((Double(revs &- last.revs) / dt * 60).rounded())
-                }
-            }
-            crankRevs = Int(revs); crankEvt = Int(t)
-            lastCrank = (revs, t)
-        }
-        var ev: [String: Any] = ["src": "pwr", "watts": watts]
-        if let n = deviceName(peripheral) { ev["device"] = n }
-        if let b = balancePct { ev["balance_pct"] = b }
-        if let t = torqueNm { ev["torque_nm"] = t }
-        if let w = wheelRevs { ev["wheel_revs"] = w }
-        if let w = wheelEvt { ev["wheel_evt"] = w }
-        if let c = crankRevs { ev["crank_revs"] = c }
-        if let c = crankEvt { ev["crank_evt"] = c }
-        if let s = kmh { ev["kmh"] = s }
-        if let c = rpm { ev["rpm"] = c }
-        log(ev)
-        emit(.power(PowerReading(device: deviceName(peripheral), watts: watts,
-                                 balancePct: balancePct, torqueNm: torqueNm,
-                                 kmh: kmh, rpm: rpm)))
     }
 }

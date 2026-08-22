@@ -17,6 +17,8 @@ targets:
       - Shared
       - path: ../Sources/Core
       - path: ../Sources/Components/BLE
+      - path: ../Sources/Components/Ergs
+      - path: ../Sources/Components/HeartRate
     dependencies:
       - target: OrbeatWidget
     info:

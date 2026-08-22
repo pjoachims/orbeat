@@ -211,7 +211,7 @@ struct ContentView: View {
             model.watts = p.watts
             model.touch()
             model.speedKmh = p.kmh
-            model.cadence = p.rpm
+            model.cadence = p.cadence
         case .handlebar, .trainerReady, .trainerLost:
             break   // no trainer UI on iOS yet
         }

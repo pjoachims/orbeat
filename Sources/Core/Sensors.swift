@@ -12,17 +12,20 @@ struct HeartRateReading {
     let rrMs: [Int]?
 }
 
-/// A decoded cycling-power measurement (standard BLE 0x2A63 packet) with
-/// speed/cadence already derived from the wheel/crank revolution deltas.
+/// One power/erg telemetry sample from any equipment source — bike trainer,
+/// crank power meter, rower (RowErg), etc. Decoders in Components/Ergs all
+/// produce this, whatever transport they speak.
 struct PowerReading {
     let device: String?
     let watts: Int
-    /// Pedal power balance (%), if present.
-    let balancePct: Double?
-    /// Accumulated torque (Nm), if present.
-    let torqueNm: Double?
+    /// Cadence: crank RPM on a bike, stroke rate SPM on a rower. nil when the
+    /// source doesn't report it.
+    let cadence: Int?
+    /// Ground/virtual speed where the source has a wheel or flywheel model;
+    /// rowers report pace instead (ponytail) so usually nil there.
     let kmh: Double?
-    let rpm: Int?
+    let balancePct: Double?
+    let torqueNm: Double?
 }
 
 /// Any sink for structured diagnostics. The BLE component logs every raw
@@ -30,14 +33,6 @@ struct PowerReading {
 /// JSONL file. Injected, so components never depend on a concrete logger.
 protocol LogWriting: AnyObject {
     func log(_ fields: [String: Any])
-}
-
-/// Neutral handlebar-controller input — what the rider did, regardless of
-/// which brand of controller decoded it. Components translate their proprietary
-/// button frames into these; app policy (e.g. grade stepping) consumes them.
-enum HandlebarInput {
-    case shiftUp
-    case shiftDown
 }
 
 /// Everything the BLE component reports upward. The app layer maps these onto
