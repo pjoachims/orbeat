@@ -15,9 +15,8 @@ targets:
     sources:
       - App
       - Shared
-      - path: ../Sources/HeartRate.swift
-      - path: ../Sources/Bluetooth.swift
-      - path: ../Sources/Rebroadcast.swift
+      - path: ../Sources/Core
+      - path: ../Sources/Components/BLE
     dependencies:
       - target: OrbeatWidget
     info:

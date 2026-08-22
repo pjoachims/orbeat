@@ -38,7 +38,7 @@ struct LiveDot: View {
 /// Sparkline of recent BPM, gradient area + line + leading dot. Mirrors the SVG.
 /// Hovering shows the nearest sample's BPM and timestamp.
 struct Sparkline: View {
-    let history: [HeartRate.Sample]
+    let history: [RideModel.Sample]
     private let lo = 48.0, hi = 110.0
     @State private var hoverX: CGFloat? = nil
 
@@ -112,14 +112,14 @@ struct Sparkline: View {
 
 /// Red banner shown top-center of the screen while BPM is over the threshold.
 struct WarningHUD: View {
-    @ObservedObject var hr: HeartRate
+    @ObservedObject var model: RideModel
     @State private var flash = false
     var body: some View {
         HStack(spacing: 8) {
             Text("♥").font(.system(size: 16))
                 .opacity(flash ? 1 : 0.4)
                 .animation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true), value: flash)
-            Text("\(hr.bpm) BPM — over \(hr.threshold)")
+            Text("\(model.bpm) BPM — over \(model.threshold)")
                 .font(.system(size: 14, weight: .semibold))
                 .monospacedDigit()
         }
@@ -134,7 +134,7 @@ struct WarningHUD: View {
 
 /// The heart-rate card. `compact` = menu-bar dropdown sizing; else floating widget.
 struct HeartCard: View {
-    @ObservedObject var hr: HeartRate
+    @ObservedObject var model: RideModel
     var compact: Bool = true
 
     var body: some View {
@@ -152,19 +152,19 @@ struct HeartCard: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                LiveDot(live: hr.isFresh)
+                LiveDot(live: model.isFresh)
             }
             .padding(.bottom, compact ? 10 : 14)
 
             // big number
             HStack(alignment: .lastTextBaseline, spacing: compact ? 7 : 9) {
                 if !compact { Spacer() }
-                Text(hr.bpmText)
+                Text(model.bpmText)
                     .font(.system(size: compact ? 46 : 76, weight: .semibold))
                     .monospacedDigit()
                     .kerning(compact ? -2 : -3)
                     .contentTransition(.numericText())
-                    .animation(.spring(duration: 0.4), value: hr.bpm)
+                    .animation(.spring(duration: 0.4), value: model.bpm)
                 Text("BPM")
                     .font(.system(size: compact ? 13 : 15, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -172,23 +172,23 @@ struct HeartCard: View {
                 if !compact { Spacer() }
             }
 
-            Sparkline(history: hr.history)
+            Sparkline(history: model.history)
                 .frame(height: compact ? 52 : 60)
                 .padding(.vertical, compact ? 6 : 8)
-                .opacity(hr.isFresh ? 1 : 0.35)   // old curve mustn't read as current
+                .opacity(model.isFresh ? 1 : 0.35)   // old curve mustn't read as current
 
             // stats
             if compact {
                 HStack {
-                    stat("Resting", txt(hr.restingBPM)); Spacer()
-                    stat("Min", txt(hr.minBPM)); Spacer()
-                    stat("Max", txt(hr.maxBPM))
+                    stat("Resting", txt(model.restingBPM)); Spacer()
+                    stat("Min", txt(model.minBPM)); Spacer()
+                    stat("Max", txt(model.maxBPM))
                 }
                 .font(.system(size: 11))
                 .padding(.vertical, 9)
                 .overlay(Divider(), alignment: .top)
                 .overlay(Divider(), alignment: .bottom)
-                if hr.watts != nil {
+                if model.watts != nil {
                     HStack {
                         stat("⚡", wattsTxt); Spacer()
                         stat("RPM", cadenceTxt); Spacer()
@@ -200,13 +200,13 @@ struct HeartCard: View {
                 }
             } else {
                 HStack(spacing: 6) {
-                    bigStat("RESTING", txt(hr.restingBPM))
-                    bigStat("MIN", txt(hr.minBPM))
-                    bigStat("MAX", txt(hr.maxBPM))
+                    bigStat("RESTING", txt(model.restingBPM))
+                    bigStat("MIN", txt(model.minBPM))
+                    bigStat("MAX", txt(model.maxBPM))
                 }
                 .padding(.top, 15)
                 .overlay(Divider(), alignment: .top)
-                if hr.watts != nil {
+                if model.watts != nil {
                     HStack(spacing: 6) {
                         bigStat("POWER", wattsTxt)
                         bigStat("RPM", cadenceTxt)
@@ -219,16 +219,16 @@ struct HeartCard: View {
             // footer
             HStack {
                 HStack(spacing: 6) {
-                    Circle().fill(hr.hasData && hr.isFresh ? hr.zoneColor : .secondary)
+                    Circle().fill(model.hasData && model.isFresh ? model.zoneColor : .secondary)
                         .frame(width: 6, height: 6)
-                    Text(hr.hasData ? (hr.isFresh ? hr.zone : "Signal lost") : "No device")
+                    Text(model.hasData ? (model.isFresh ? model.zone : "Signal lost") : "No device")
                         .font(.system(size: 11, weight: .semibold))
                 }
                 .padding(.horizontal, compact ? 10 : 11)
                 .padding(.vertical, compact ? 4 : 5)
                 .background(Capsule().fill(.primary.opacity(0.08)))
                 Spacer()
-                Text(hr.hasData ? hr.syncLabel : hr.bleStatus)
+                Text(model.hasData ? model.syncLabel : model.bleStatus)
                     .font(.system(size: compact ? 10.5 : 11))
                     .foregroundStyle(.tertiary)
             }
@@ -238,10 +238,10 @@ struct HeartCard: View {
         .frame(width: compact ? 262 : 288)
     }
 
-    private func txt(_ v: Int) -> String { hr.hasData && hr.isFresh ? "\(v)" : "––" }
-    private var wattsTxt: String { hr.displayWatts.map { "\($0) W" } ?? "––" }
-    private var cadenceTxt: String { hr.displayCadence.map { "\($0)" } ?? "––" }
-    private var speedTxt: String { hr.displaySpeedKmh.map { String(format: "%.1f km/h", $0) } ?? "––" }
+    private func txt(_ v: Int) -> String { model.hasData && model.isFresh ? "\(v)" : "––" }
+    private var wattsTxt: String { model.displayWatts.map { "\($0) W" } ?? "––" }
+    private var cadenceTxt: String { model.displayCadence.map { "\($0)" } ?? "––" }
+    private var speedTxt: String { model.displaySpeedKmh.map { String(format: "%.1f km/h", $0) } ?? "––" }
     private func stat(_ label: String, _ v: String) -> some View {
         HStack(spacing: 4) {
             Text(label).foregroundStyle(.secondary)

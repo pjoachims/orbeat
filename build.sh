@@ -13,7 +13,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 swiftc -O \
   -target arm64-apple-macosx13.0 \
   -framework SwiftUI -framework AppKit -framework Combine -framework CoreBluetooth \
-  Sources/*.swift \
+  $(find Sources -name '*.swift') \
   -o "$APP/Contents/MacOS/$EXEC"
 
 cp Resources/Orbeat.icns "$APP/Contents/Resources/"

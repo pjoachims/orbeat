@@ -7,15 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02281BF7E13F781313BA6AEE /* RideModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B393EE3CC8D34A6BFEB4F7BC /* RideModel.swift */; };
+		1D90656435825DF65BC773F5 /* ZwiftRideController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8317BA26D785FD27361B7834 /* ZwiftRideController.swift */; };
+		206C36098AE1F002D36AAF49 /* ZwiftButtonFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA4315B4CFE6DC20D707EA34 /* ZwiftButtonFrame.swift */; };
 		3067A528D85A2BFCC66EDADE /* OrbeatActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */; };
-		38C70DFEF919890FC67F5C27 /* Bluetooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20AFD8421951BE412E289CAB /* Bluetooth.swift */; };
 		3F300C97BF5FC11B0A4BBA5E /* OrbeatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */; };
-		5AF8C6C5667ED1ADA944C7DE /* HeartRate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1133B536C9DB3960CC871E47 /* HeartRate.swift */; };
 		612DB140873E6E5CBD3FDC6E /* OrbeatWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		647B10E7C31D20C4810AE554 /* Rebroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCC29D707584EB83C39B118 /* Rebroadcast.swift */; };
 		6E2AF45C2641FCD83481484D /* OrbeatActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */; };
+		6E4487104D87ED4321AFD09B /* Bluetooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01138451D2A610D8D6F287D9 /* Bluetooth.swift */; };
 		760B187D4989F076873DD268 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */; };
+		89A52CD6B97D2D4D1ED66F73 /* Rebroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8701A702EF20CCAD22631828 /* Rebroadcast.swift */; };
 		C7C193F6C811290BB653AD76 /* OrbeatWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D18B526DA33C2A14775665 /* OrbeatWidget.swift */; };
+		DE3C7BBBCF061F3247ABA310 /* Sensors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54E310D7E9F6B4CBB74BD562 /* Sensors.swift */; };
+		E457479546F76AEA0CA5EEF1 /* Trainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96170E30DA4A169283B4472 /* Trainer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,29 +47,32 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		01138451D2A610D8D6F287D9 /* Bluetooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bluetooth.swift; sourceTree = "<group>"; };
 		03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatActivity.swift; sourceTree = "<group>"; };
-		1133B536C9DB3960CC871E47 /* HeartRate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartRate.swift; sourceTree = "<group>"; };
-		20AFD8421951BE412E289CAB /* Bluetooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bluetooth.swift; sourceTree = "<group>"; };
-		3CCC29D707584EB83C39B118 /* Rebroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rebroadcast.swift; sourceTree = "<group>"; };
+		54E310D7E9F6B4CBB74BD562 /* Sensors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sensors.swift; sourceTree = "<group>"; };
 		646A37EDB88E069642C3DD00 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = OrbeatWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		806A07E289E5372800293336 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		8317BA26D785FD27361B7834 /* ZwiftRideController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZwiftRideController.swift; sourceTree = "<group>"; };
+		8701A702EF20CCAD22631828 /* Rebroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rebroadcast.swift; sourceTree = "<group>"; };
 		A2FE9D0D9784B3C47AC38764 /* Orbeat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Orbeat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B393EE3CC8D34A6BFEB4F7BC /* RideModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideModel.swift; sourceTree = "<group>"; };
+		BA4315B4CFE6DC20D707EA34 /* ZwiftButtonFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZwiftButtonFrame.swift; sourceTree = "<group>"; };
 		C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatApp.swift; sourceTree = "<group>"; };
+		C96170E30DA4A169283B4472 /* Trainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trainer.swift; sourceTree = "<group>"; };
 		F1D18B526DA33C2A14775665 /* OrbeatWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatWidget.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		0F7818FD0905C4CEE345D9BB /* Sources */ = {
+		33CC2BA56E49FA7EDF801A35 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				20AFD8421951BE412E289CAB /* Bluetooth.swift */,
-				1133B536C9DB3960CC871E47 /* HeartRate.swift */,
-				3CCC29D707584EB83C39B118 /* Rebroadcast.swift */,
+				B393EE3CC8D34A6BFEB4F7BC /* RideModel.swift */,
+				54E310D7E9F6B4CBB74BD562 /* Sensors.swift */,
 			);
-			name = Sources;
-			path = ../Sources;
+			name = Core;
+			path = ../Sources/Core;
 			sourceTree = "<group>";
 		};
 		51C27E04703BDCF7E371675B /* App */ = {
@@ -82,11 +89,24 @@
 			isa = PBXGroup;
 			children = (
 				51C27E04703BDCF7E371675B /* App */,
+				70AA9BB84303F2F590ED7400 /* BLE */,
+				33CC2BA56E49FA7EDF801A35 /* Core */,
 				BD2B9080708B7A21A5E2AF6E /* Shared */,
-				0F7818FD0905C4CEE345D9BB /* Sources */,
 				92571719749A1214694565C6 /* Widget */,
 				AE557A3DB3AE962934C2DBA6 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		70AA9BB84303F2F590ED7400 /* BLE */ = {
+			isa = PBXGroup;
+			children = (
+				01138451D2A610D8D6F287D9 /* Bluetooth.swift */,
+				8701A702EF20CCAD22631828 /* Rebroadcast.swift */,
+				C96170E30DA4A169283B4472 /* Trainer.swift */,
+				DEF65951A5BABC61F6B562E6 /* Zwift */,
+			);
+			name = BLE;
+			path = ../Sources/Components/BLE;
 			sourceTree = "<group>";
 		};
 		92571719749A1214694565C6 /* Widget */ = {
@@ -113,6 +133,15 @@
 				03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */,
 			);
 			path = Shared;
+			sourceTree = "<group>";
+		};
+		DEF65951A5BABC61F6B562E6 /* Zwift */ = {
+			isa = PBXGroup;
+			children = (
+				BA4315B4CFE6DC20D707EA34 /* ZwiftButtonFrame.swift */,
+				8317BA26D785FD27361B7834 /* ZwiftRideController.swift */,
+			);
+			path = Zwift;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -210,11 +239,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				38C70DFEF919890FC67F5C27 /* Bluetooth.swift in Sources */,
-				5AF8C6C5667ED1ADA944C7DE /* HeartRate.swift in Sources */,
+				6E4487104D87ED4321AFD09B /* Bluetooth.swift in Sources */,
 				6E2AF45C2641FCD83481484D /* OrbeatActivity.swift in Sources */,
 				3F300C97BF5FC11B0A4BBA5E /* OrbeatApp.swift in Sources */,
-				647B10E7C31D20C4810AE554 /* Rebroadcast.swift in Sources */,
+				89A52CD6B97D2D4D1ED66F73 /* Rebroadcast.swift in Sources */,
+				02281BF7E13F781313BA6AEE /* RideModel.swift in Sources */,
+				DE3C7BBBCF061F3247ABA310 /* Sensors.swift in Sources */,
+				E457479546F76AEA0CA5EEF1 /* Trainer.swift in Sources */,
+				206C36098AE1F002D36AAF49 /* ZwiftButtonFrame.swift in Sources */,
+				1D90656435825DF65BC773F5 /* ZwiftRideController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

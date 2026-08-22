@@ -13,8 +13,11 @@ struct OrbeatApp {
     }
 }
 
+/// Composition root: wires the BLE component's events onto the ride model and
+/// owns all app policy (grade stepping from Ride paddles, thresholds, logging).
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let hr = HeartRate()
+    let model = RideModel()
+    let recorder = Recorder()
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var floatingPanel: NSPanel?
@@ -33,11 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(
-            rootView: HeartCard(hr: hr, compact: true).padding(2))
+            rootView: HeartCard(model: model, compact: true).padding(2))
 
         // Refresh the menu-bar title whenever any displayed metric ticks.
-        bpmObserver = hr.$bpm.combineLatest(hr.$watts, hr.$cadence, hr.$speedKmh)
-            .combineLatest(hr.$isFresh)
+        bpmObserver = model.$bpm.combineLatest(model.$watts, model.$cadence, model.$speedKmh)
+            .combineLatest(model.$isFresh)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.updateStatusTitle() }
             } as AnyObject
@@ -46,29 +49,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Start scanning for a standard BLE heart-rate device (incl. a Fitbit
         // in workout "broadcast heart rate" mode). Falls back to the simulator.
-        ble = BLEManager(model: hr)
+        let manager = BLEManager(log: recorder)
+        manager.onEvent = { [weak self] in self?.handle($0) }
+        ble = manager
+    }
+
+    // MARK: BLE event routing (the only place the component meets the model)
+
+    private func handle(_ event: BLEEvent) {
+        switch event {
+        case .status(let s):
+            model.bleStatus = s
+        case .heartLinkUp(let device):
+            model.setLive(true, source: device)
+        case .heartLinkDown:
+            model.setLive(false, source: "Disconnected")
+        case .powerLinkUp(let device):
+            model.powerSource = device
+        case .powerLinkDown:
+            model.watts = nil
+            model.cadence = nil
+            model.speedKmh = nil
+            model.powerSource = ""
+        case .heartRate(let r):
+            if r.bpm > 0 { model.ingest(r.bpm) }
+        case .power(let p):
+            model.watts = p.watts
+            model.touch()   // power packets count as a sync too
+            model.speedKmh = p.kmh
+            model.cadence = p.rpm
+        case .handlebar(let inputs):
+            applyRidePress(inputs)
+        case .trainerReady:
+            model.trainerControllable = true
+            model.grade = stepGrade(by: 0)   // push the persisted grade to hardware
+        case .trainerLost:
+            model.trainerControllable = false
+        }
+    }
+
+    /// Handlebar inputs → trainer commands. The only difficulty policy: a fresh
+    /// shift-up paddle raises grade, shift-down lowers it.
+    private func applyRidePress(_ inputs: [HandlebarInput]) {
+        for input in inputs {
+            switch input {
+            case .shiftUp: _ = stepGrade(by: Trainer.gradeStep)
+            case .shiftDown: _ = stepGrade(by: -Trainer.gradeStep)
+            }
+        }
+    }
+
+    /// Nudge the trainer's grade by `delta` (0.01% units); updates the model and
+    /// pushes to hardware. Called by the menu Harder/Easier items and paddles.
+    @discardableResult
+    private func stepGrade(by delta: Int) -> Int {
+        let g = ble?.setGrade(model.grade + delta) ?? model.grade + delta
+        model.grade = g
+        return g
     }
 
     private func updateStatusTitle() {
         guard let button = statusItem.button else { return }
-        let over = hr.overThreshold
+        let over = model.overThreshold
         let heartColor = over ? NSColor.white : NSColor(red: 1.0, green: 0.22, blue: 0.37, alpha: 1)
         let glyphAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13)]
         let valueAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold),
             .foregroundColor: over ? NSColor.white : NSColor.labelColor]
         var segs: [(glyph: String, value: String, color: NSColor?)] = []
-        if hr.barMetrics.contains("heart") { segs.append(("♥ ", hr.bpmText, heartColor)) }
-        if hr.barMetrics.contains("power") {
-            segs.append(("⚡", hr.displayWatts.map { "\($0)" } ?? "––", nil))
+        if model.barMetrics.contains("heart") { segs.append(("♥ ", model.bpmText, heartColor)) }
+        if model.barMetrics.contains("power") {
+            segs.append(("⚡", model.displayWatts.map { "\($0)" } ?? "––", nil))
         }
-        if hr.barMetrics.contains("rpm") {
-            segs.append(("⟳ ", hr.displayCadence.map { "\($0)" } ?? "––", nil))
+        if model.barMetrics.contains("rpm") {
+            segs.append(("⟳ ", model.displayCadence.map { "\($0)" } ?? "––", nil))
         }
-        if hr.barMetrics.contains("speed") {
-            segs.append(("≫ ", hr.displaySpeedKmh.map { String(format: "%.1f", $0) } ?? "––", nil))
+        if model.barMetrics.contains("speed") {
+            segs.append(("≫ ", model.displaySpeedKmh.map { String(format: "%.1f", $0) } ?? "––", nil))
         }
-        if segs.isEmpty { segs = [("♥ ", hr.bpmText, heartColor)] }   // never a blank bar
+        if segs.isEmpty { segs = [("♥ ", model.bpmText, heartColor)] }   // never a blank bar
         let s = NSMutableAttributedString()
         for (idx, seg) in segs.enumerated() {
             if idx > 0 { s.append(NSAttributedString(string: "  ", attributes: valueAttrs)) }
@@ -86,9 +145,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var warningPanel: NSPanel?
     private func updateWarningHUD() {
-        if hr.overThreshold {
+        if model.overThreshold {
             guard warningPanel == nil, let screen = NSScreen.main else { return }
-            let host = NSHostingController(rootView: WarningHUD(hr: hr))
+            let host = NSHostingController(rootView: WarningHUD(model: model))
             let panel = NSPanel(contentRect: .zero,
                                 styleMask: [.nonactivatingPanel, .borderless],
                                 backing: .buffered, defer: false)
@@ -129,10 +188,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showMenu() {
         let menu = NSMenu()
-        let src = NSMenuItem(title: "Source: \(hr.sourceName)", action: nil, keyEquivalent: "")
+        let src = NSMenuItem(title: "Source: \(model.sourceName)", action: nil, keyEquivalent: "")
         src.isEnabled = false
         menu.addItem(src)
-        let status = NSMenuItem(title: hr.bleStatus, action: nil, keyEquivalent: "")
+        let status = NSMenuItem(title: model.bleStatus, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
         menu.addItem(.separator())
@@ -149,7 +208,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             equipSub.addItem(none)
         }
         for (i, d) in devices.enumerated() {
-            let item = NSMenuItem(title: "\(d.name) — \(d.isPower ? "Power" : "Heart Rate")",
+            let kind = d.isRide ? "Controller" : d.isPower ? "Power" : "Heart Rate"
+            let item = NSMenuItem(title: "\(d.name) — \(kind)",
                                   action: #selector(connectEquipment(_:)), keyEquivalent: "")
             item.target = self
             item.tag = i
@@ -169,11 +229,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         equipItem.submenu = equipSub
         menu.addItem(equipItem)
+        if model.trainerControllable {
+            let target = NSMenuItem(title: String(format: "Trainer grade: %.1f%%", Double(model.grade) / 100),
+                                    action: nil, keyEquivalent: "")
+            target.isEnabled = false
+            menu.addItem(target)
+            let harder = NSMenuItem(title: "Harder (+1%)", action: #selector(harder), keyEquivalent: "")
+            harder.target = self
+            menu.addItem(harder)
+            let easier = NSMenuItem(title: "Easier (−1%)", action: #selector(easier), keyEquivalent: "")
+            easier.target = self
+            menu.addItem(easier)
+        }
         let shareItem = NSMenuItem(title: "Share Sensors via Bluetooth",
                                    action: #selector(toggleRebroadcast), keyEquivalent: "")
         shareItem.target = self
         shareItem.state = (ble?.rebroadcaster.enabled ?? false) ? .on : .off
         menu.addItem(shareItem)
+        let logItem = NSMenuItem(title: "Log to DuckDB (JSONL)",
+                                 action: #selector(toggleDuckDBLog), keyEquivalent: "")
+        logItem.target = self
+        logItem.state = recorder.recording ? .on : .off
+        menu.addItem(logItem)
+        if recorder.recording {
+            let reveal = NSMenuItem(title: "Reveal Log in Finder",
+                                    action: #selector(revealLog), keyEquivalent: "")
+            reveal.target = self
+            menu.addItem(reveal)
+        }
         let barItem = NSMenuItem(title: "Menu Bar Shows", action: nil, keyEquivalent: "")
         let barSub = NSMenu()
         for (title, key) in [("Heart Rate", "heart"), ("Power", "power"),
@@ -181,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let item = NSMenuItem(title: title, action: #selector(toggleBarMetric(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = key
-            item.state = hr.barMetrics.contains(key) ? .on : .off
+            item.state = model.barMetrics.contains(key) ? .on : .off
             barSub.addItem(item)
         }
         barItem.submenu = barSub
@@ -194,11 +277,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                   action: #selector(setThreshold(_:)), keyEquivalent: "")
             item.target = self
             item.tag = v
-            item.state = hr.threshold == v ? .on : .off
+            item.state = model.threshold == v ? .on : .off
             sub.addItem(item)
         }
-        let isCustom = !presets.contains(hr.threshold)
-        let custom = NSMenuItem(title: isCustom ? "Custom (\(hr.threshold) BPM)…" : "Custom…",
+        let isCustom = !presets.contains(model.threshold)
+        let custom = NSMenuItem(title: isCustom ? "Custom (\(model.threshold) BPM)…" : "Custom…",
                                 action: #selector(customThreshold), keyEquivalent: "")
         custom.target = self
         custom.state = isCustom ? .on : .off
@@ -215,13 +298,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleBarMetric(_ sender: NSMenuItem) {
         guard let key = sender.representedObject as? String else { return }
-        if hr.barMetrics.contains(key) { hr.barMetrics.remove(key) }
-        else { hr.barMetrics.insert(key) }
+        if model.barMetrics.contains(key) { model.barMetrics.remove(key) }
+        else { model.barMetrics.insert(key) }
         updateStatusTitle()
     }
 
     @objc private func toggleRebroadcast() {
         ble?.rebroadcaster.enabled.toggle()
+    }
+
+    @objc private func harder() { _ = stepGrade(by: 100) }
+    @objc private func easier() { _ = stepGrade(by: -100) }
+
+    @objc private func toggleDuckDBLog() {
+        recorder.recording.toggle()
+    }
+
+    @objc private func revealLog() {
+        NSWorkspace.shared.activateFileViewerSelecting([Recorder.logURL])
     }
 
     @objc private func connectEquipment(_ sender: NSMenuItem) {
@@ -235,7 +329,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func setThreshold(_ sender: NSMenuItem) {
-        hr.threshold = sender.tag
+        model.threshold = sender.tag
         updateStatusTitle()
     }
 
@@ -249,14 +343,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fmt.minimum = 1
         fmt.maximum = 250
         field.formatter = fmt
-        if hr.threshold > 0 { field.integerValue = hr.threshold }
+        if model.threshold > 0 { field.integerValue = model.threshold }
         alert.accessoryView = field
         alert.addButton(withTitle: "Set")
         alert.addButton(withTitle: "Cancel")
         alert.window.initialFirstResponder = field
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn, field.integerValue > 0 {
-            hr.threshold = field.integerValue
+            model.threshold = field.integerValue
             updateStatusTitle()
         }
     }
@@ -268,7 +362,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let host = NSHostingController(rootView:
-            HeartCard(hr: hr, compact: false)
+            HeartCard(model: model, compact: false)
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 22)))
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 288, height: 360),

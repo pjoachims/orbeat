@@ -13,7 +13,7 @@ struct OrbeatAttributes: ActivityAttributes {
     }
 }
 
-/// Zone color for a BPM value — mirrors HeartRate.zoneColor, which the widget
+/// Zone color for a BPM value — mirrors RideModel.zoneColor, which the widget
 /// target doesn't compile (it drags in Combine/UserDefaults state it can't use).
 func orbeatZoneColor(_ bpm: Int) -> Color {
     switch bpm {

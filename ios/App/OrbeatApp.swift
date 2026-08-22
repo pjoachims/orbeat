@@ -5,14 +5,14 @@ import UIKit
 
 @main
 struct OrbeatApp: App {
-    @StateObject private var model = HeartRate()
+    @StateObject private var model = RideModel()
     var body: some Scene {
         WindowGroup { ContentView(model: model) }
     }
 }
 
 struct ContentView: View {
-    @ObservedObject var model: HeartRate
+    @ObservedObject var model: RideModel
     @State private var ble: BLEManager?
     @State private var activity: Activity<OrbeatAttributes>?
     @State private var showDevices = false
@@ -183,15 +183,45 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(1.1))
         }
         #else
-        if ble == nil { ble = BLEManager(model: model) }
+        guard ble == nil else { return }
+        let manager = BLEManager()
+        manager.onEvent = { [weak self] event in
+            guard let self else { return }
+            self.apply(event, to: self.model)
+        }
+        ble = manager
         #endif
+    }
+
+    /// Map component events onto the shared model (composition root).
+    private func apply(_ event: BLEEvent, to model: RideModel) {
+        switch event {
+        case .status(let s): model.bleStatus = s
+        case .heartLinkUp(let device): model.setLive(true, source: device)
+        case .heartLinkDown: model.setLive(false, source: "Disconnected")
+        case .powerLinkUp(let device): model.powerSource = device
+        case .powerLinkDown:
+            model.watts = nil
+            model.cadence = nil
+            model.speedKmh = nil
+            model.powerSource = ""
+        case .heartRate(let r):
+            if r.bpm > 0 { model.ingest(r.bpm) }
+        case .power(let p):
+            model.watts = p.watts
+            model.touch()
+            model.speedKmh = p.kmh
+            model.cadence = p.rpm
+        case .handlebar, .trainerReady, .trainerLost:
+            break   // no trainer UI on iOS yet
+        }
     }
 }
 
 /// Discovered-sensor list — the iOS stand-in for the macOS "Connect Equipment" menu.
 struct DeviceSheet: View {
     let ble: BLEManager?
-    @ObservedObject var model: HeartRate
+    @ObservedObject var model: RideModel
     // ponytail: 1s tick re-reads ble.discovered (not observable); fine for a settings sheet
     @State private var tick = 0
     @State private var scanAll = false

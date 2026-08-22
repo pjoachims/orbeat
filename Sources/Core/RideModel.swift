@@ -1,12 +1,12 @@
 import SwiftUI
 import Combine
 
-/// Heart-rate engine.
+/// Ride model: the single observable UI state shared by every platform —
+/// heart rate plus power, cadence, speed and trainer grade.
 ///
-/// Currently drives a simulated live BPM signal identical in spirit to the
-/// design mockup (random walk, ~1.1s tick). Swap `tick()` for a real Fitbit
-/// feed by filling in `FitbitClient` — see Fitbit.swift.
-final class HeartRate: ObservableObject {
+/// Components never write into it directly; the app layer maps BLEEvent
+/// values onto it. `ingest`/`touch`/`setLive` are its only inputs.
+final class RideModel: ObservableObject {
     /// Master switch for the fake signal. Off → only real BLE data drives the UI.
     static let simulated = false
 
@@ -37,6 +37,14 @@ final class HeartRate: ObservableObject {
     @Published var cadence: Int? = nil        // crank RPM
     @Published var speedKmh: Double? = nil    // virtual speed from wheel revs
     @Published var powerSource: String = ""
+    /// Trainer ERG target in watts, driven by the Zwift Ride shifter buttons. Persisted.
+    /// Trainer sim grade in 0.01% units (0 = flat). Default flat so it never
+    /// resists hard until a paddle raises it.
+    @Published var grade: Int = UserDefaults.standard.object(forKey: "grade") as? Int ?? 0 {
+        didSet { UserDefaults.standard.set(grade, forKey: "grade") }
+    }
+    /// True once a controllable trainer (FTMS control point) is connected.
+    @Published var trainerControllable = false
     /// Metrics shown in the menu bar: any of "heart", "power", "rpm", "speed". Persisted.
     @Published var barMetrics: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: "barMetrics") ?? ["heart"]) {
@@ -61,10 +69,10 @@ final class HeartRate: ObservableObject {
                 let f = Date().timeIntervalSince(self.lastSync) < 60
                 if f != self.isFresh { self.isFresh = f }
             }
-        if HeartRate.simulated {
+        if RideModel.simulated {
             let now = Date()
-            history = HeartRate.seed.enumerated().map { i, v in
-                Sample(time: now.addingTimeInterval(Double(i - HeartRate.seed.count) * 1.1), bpm: v)
+            history = RideModel.seed.enumerated().map { i, v in
+                Sample(time: now.addingTimeInterval(Double(i - RideModel.seed.count) * 1.1), bpm: v)
             }
             bpm = 72; minBPM = 52; maxBPM = 141
             start()
