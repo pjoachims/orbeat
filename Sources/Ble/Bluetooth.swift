@@ -307,8 +307,11 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             // Accept button frames from any peripheral exposing the Zwift service
             // (both a standalone Zwift Ride and the KICKR bridge can appear).
             // Raw log every notification so we can see the actual frame format.
-            log(["src": "zwiftraw", "char": characteristic.uuid.uuidString.suffix(4).description,
-                 "raw": bytes.map { String(format: "%02x", $0) }.joined()])
+            var ev: [String: Any] = ["src": "zwiftraw",
+                 "char": characteristic.uuid.uuidString.suffix(4).description,
+                 "raw": bytes.map { String(format: "%02x", $0) }.joined()]
+            if let n = deviceName(peripheral) { ev["device"] = n }
+            log(ev)
             guard let frame = ride.handle(bytes) else { return }
             // Translate the proprietary bitmap into neutral intents for Core.
             var inputs: [HandlebarInput] = []
@@ -319,7 +322,10 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
                 inputs.append(.shiftDown)
             }
             if !inputs.isEmpty { emit(.handlebar(inputs)) }
-            log(["src": "ride", "raw": frame.raw, "pressed": frame.pressed])
+            var rideEv: [String: Any] = ["src": "ride", "raw": frame.raw,
+                                         "pressed": frame.pressed]
+            if let n = deviceName(peripheral) { rideEv["device"] = n }
+            log(rideEv)
         case hrMeasurement:
             // Only the HR-slot device; a rebroadcast bridge in the power slot
             // could expose HR too and double-feed the model.
