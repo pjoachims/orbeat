@@ -14,6 +14,7 @@ import CoreBluetooth
 final class Trainer {
     static let service = CBUUID(string: "1826")
     static let controlPoint = CBUUID(string: "2AD9")
+    static let machineStatus = CBUUID(string: "2ADA")   // notifies target changes
 
     private weak var peripheral: CBPeripheral?
     private var control: CBCharacteristic?
@@ -32,6 +33,10 @@ final class Trainer {
     func detach() {
         peripheral = nil; control = nil; mode = nil
     }
+
+    /// Trainer told us its target (possibly set by another app) — adopt it so
+    /// the next step continues from the real value.
+    func observed(_ m: TrainerMode) { mode = m }
 
     /// Push a control target. Returns the applied (clamped) value so the
     /// caller can keep its state in sync. Without attached hardware this

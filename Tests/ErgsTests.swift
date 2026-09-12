@@ -46,24 +46,32 @@ struct ErgsTests {
         check("pwr first packet no deltas", first.kmh == nil && first.rpm == nil, "\(first)")
         check("pwr watts", first.watts == 250)
 
-        let second = p.parse(powerPacket(watts: 260, wheelRevs: 1100, wheelT: 3072,
-                                         crankRevs: 508, crankT: 1536), device: "KICKR")!
-        // Δwheel=100 revs over dt=0.5 s, circ 2.105 m → 1515.6 km/h (spin bike!)
-        let expectKmh = 100 * 2.105 / 0.5 * 3.6
+        let second = p.parse(powerPacket(watts: 260, wheelRevs: 1010, wheelT: 4096,
+                                         crankRevs: 502, crankT: 2048), device: "KICKR")!
+        // Δwheel=10 revs over dt=1 s, circ 2.105 m → 75.78 km/h
+        let expectKmh = 10 * 2.105 / 1.0 * 3.6
         check("pwr speed math", abs(second.kmh! - expectKmh) < 0.01, "\(second.kmh!) vs \(expectKmh)")
-        // Δcrank=8 revs over dt=0.5 s → 960 rpm
-        check("pwr cadence math", second.rpm == 960, "\(second.rpm!)")
-        check("pwr raw counters", second.crankRevs == 508 && second.wheelEvt == 3072, "\(second)")
+        // Δcrank=2 revs over dt=1 s → 120 rpm
+        check("pwr cadence math", second.rpm == 120, "\(second.rpm!)")
+        check("pwr raw counters", second.crankRevs == 502 && second.wheelEvt == 4096, "\(second)")
         check("pwr device name", second.device == "KICKR")
-        check("pwr reading maps cadence", second.reading.cadence == 960 && second.reading.watts == 260)
+        check("pwr reading maps cadence", second.reading.cadence == 120 && second.reading.watts == 260)
 
-        let stopped = p.parse(powerPacket(watts: 5, wheelRevs: 1100, wheelT: 3072,
-                                          crankRevs: 508, crankT: 1536), device: nil)!
+        let stopped = p.parse(powerPacket(watts: 5, wheelRevs: 1010, wheelT: 4096,
+                                          crankRevs: 502, crankT: 2048), device: nil)!
         check("pwr stopped → zero", stopped.kmh == 0 && stopped.rpm == 0, "\(stopped)")
 
+        // Trainer counters reset to 0 mid-link (standby): delta wraps to ~65k revs.
+        let wrapped = p.parse(powerPacket(watts: 5, wheelRevs: 0, wheelT: 6144,
+                                          crankRevs: 0, crankT: 3072), device: nil)!
+        check("pwr counter reset → no sample", wrapped.kmh == nil && wrapped.rpm == nil, "\(wrapped)")
+        let resumed = p.parse(powerPacket(watts: 5, wheelRevs: 10, wheelT: 8192,
+                                          crankRevs: 2, crankT: 4096), device: nil)!
+        check("pwr resumes after counter reset", resumed.rpm == 120 && abs(resumed.kmh! - expectKmh) < 0.01, "\(resumed)")
+
         p.reset()
-        let afterReset = p.parse(powerPacket(watts: 5, wheelRevs: 1100, wheelT: 3072,
-                                             crankRevs: 508, crankT: 1536), device: nil)!
+        let afterReset = p.parse(powerPacket(watts: 5, wheelRevs: 1010, wheelT: 4096,
+                                             crankRevs: 502, crankT: 2048), device: nil)!
         check("pwr reset clears deltas", afterReset.kmh == nil && afterReset.rpm == nil)
 
         check("pwr truncated → nil", p.parse([0x30, 0x00, 0xFA], device: nil) == nil)
@@ -95,5 +103,26 @@ struct ErgsTests {
               ftms3.kmh == 1.0 && ftms3.rpm == 60 && ftms3.watts == 452, "\(ftms3)")
 
         check("ftms truncated", FtmsIndoorBikeParser.parse([0x44], device: nil) == nil)
+
+        // MARK: FtmsMachineStatus (0x2ADA)
+
+        check("status sim grade", FtmsMachineStatus.parse([0x12, 0, 0, 0x20, 0x03, 0, 0]) == .sim(grade: 800))
+        check("status sim negative grade",
+              FtmsMachineStatus.parse([0x12, 0, 0, 0x9C, 0xFF, 0, 0]) == .sim(grade: -100))
+        check("status target power", FtmsMachineStatus.parse([0x08, 0xC8, 0x00]) == .erg(targetWatts: 200))
+        check("status resistance u8", FtmsMachineStatus.parse([0x07, 0x64]) == .resistance(percent: 10))
+        check("status resistance s16", FtmsMachineStatus.parse([0x07, 0x90, 0x01]) == .resistance(percent: 40))
+        check("status other opcode ignored", FtmsMachineStatus.parse([0x04, 0x00]) == nil)
+        check("status truncated", FtmsMachineStatus.parse([0x12, 0, 0]) == nil
+              && FtmsMachineStatus.parse([0x08]) == nil)
+
+        // MARK: bridge: control-point write → mode → synthesized status
+        for m in [TrainerMode.sim(grade: -100), .sim(grade: 800), .erg(targetWatts: 250), .resistance(percent: 40)] {
+            check("status encode round-trips \(m)", FtmsMachineStatus.parse(FtmsMachineStatus.encode(m)) == m)
+        }
+        check("control sim write", FtmsControlFrame.parse([0x11, 0, 0, 0x20, 0x03, 0, 0]) == .sim(grade: 800))
+        check("control erg write", FtmsControlFrame.parse([0x05, 0xC8, 0x00]) == .erg(targetWatts: 200))
+        check("control resistance write", FtmsControlFrame.parse([0x04, 0x90, 0x01]) == .resistance(percent: 40))
+        check("control request/start ignored", FtmsControlFrame.parse([0x00]) == nil && FtmsControlFrame.parse([0x07]) == nil)
     }
 }

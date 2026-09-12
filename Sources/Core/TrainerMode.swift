@@ -45,3 +45,23 @@ enum TrainerMode: Equatable {
     }
 
 }
+
+extension TrainerMode {
+    /// Human-readable current target, for menus and HUDs.
+    var label: String {
+        switch self {
+        case .erg(let w): return "ERG · \(w) W"
+        case .resistance(let p): return "Resistance · \(p) %"
+        case .sim(let g): return String(format: "Sim · %.1f %%", Double(g) / 100)
+        }
+    }
+
+    /// Label for one step in this mode, e.g. "+10 W".
+    var stepLabel: String {
+        switch self {
+        case .erg: return "+10 W"
+        case .resistance: return "+10 %"
+        case .sim: return "+1 %"
+        }
+    }
+}

@@ -19,7 +19,6 @@ final class RideModel: ObservableObject {
     @Published var history: [Sample] = []
     @Published var minBPM: Int = 0
     @Published var maxBPM: Int = 0
-    let restingBPM: Int = 58
     @Published var lastSync: Date = .distantPast
     /// True while the newest reading (any metric) is < 60 s old (matches the
     /// Live Activity staleDate). Timer-driven so the UI goes stale even when
@@ -84,6 +83,8 @@ final class RideModel: ObservableObject {
 
     /// True once any reading (real or simulated) has arrived.
     var hasData: Bool { !history.isEmpty }
+    /// Mean of the retained history window (last 60 samples).
+    var avgBPM: Int { history.isEmpty ? 0 : history.reduce(0) { $0 + $1.bpm } / history.count }
     var bpmText: String { hasData && isFresh ? "\(bpm)" : "––" }
     // Stale (>120 s) reads as no value everywhere these are shown.
     var displayWatts: Int? { isFresh ? watts : nil }
@@ -130,7 +131,8 @@ final class RideModel: ObservableObject {
     }
 
     /// Heart-rate zone matching the design's `zoneFor`.
-    var zone: String {
+    var zone: String { RideModel.zoneName(bpm) }
+    static func zoneName(_ bpm: Int) -> String {
         switch bpm {
         case ..<60: return "Resting"
         case ..<100: return "Fat Burn"

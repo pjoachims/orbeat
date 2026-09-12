@@ -25,6 +25,12 @@ final class CyclingPowerParser {
 
     private var lastWheel: (revs: UInt32, time: UInt16)?
     private var lastCrank: (revs: UInt16, time: UInt16)?
+    /// Discontinuity guard: trainers reset their cumulative counters (standby,
+    /// firmware resync) without dropping the link, so one delta wraps to ~65k
+    /// revs → 60000 rpm / 200000 km/h. Anything past these is a counter reset,
+    /// not motion: skip the sample and re-seed from the new counters.
+    static let maxRpm = 250
+    static let maxKmh = 120.0
     private let wheelCircumferenceM: Double
 
     /// ponytail: fixed 700x25c circumference (2.105 m); make it a setting if speed reads off
@@ -64,6 +70,7 @@ final class CyclingPowerParser {
                 } else {
                     let dt = Double(t &- last.time) / 2048.0
                     kmh = Double(revs &- last.revs) * wheelCircumferenceM / dt * 3.6
+                    if kmh! > Self.maxKmh { kmh = nil }   // counter reset
                 }
             }
             lastWheel = (revs, t)
@@ -79,6 +86,7 @@ final class CyclingPowerParser {
                 } else {
                     let dt = Double(t &- last.time) / 1024.0
                     rpm = Int((Double(revs &- last.revs) / dt * 60).rounded())
+                    if rpm! > Self.maxRpm { rpm = nil }   // counter reset
                 }
             }
             lastCrank = (revs, t)

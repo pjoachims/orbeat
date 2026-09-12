@@ -39,7 +39,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-echo "▸ Ad-hoc signing…"
-codesign --force --deep --sign - "$APP" 2>/dev/null || true
+# A real identity keeps the TCC identity stable across rebuilds; ad-hoc
+# signatures made macOS re-prompt for Bluetooth on every build.
+SIGN_ID=$(security find-identity -v -p codesigning | grep -o '"Apple Development[^"]*"' | head -1 | tr -d '"')
+echo "▸ Signing as ${SIGN_ID:-ad-hoc}…"
+codesign --force --deep --sign "${SIGN_ID:--}" "$APP" 2>/dev/null || true
 
 echo "✓ Built $APP"

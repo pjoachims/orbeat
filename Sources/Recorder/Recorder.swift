@@ -7,9 +7,16 @@ import Foundation
 /// ponytail: single append-only file, add daily rotation if it ever gets big.
 /// JSONL sink for the Core LogWriting protocol.
 final class Recorder: ObservableObject, LogWriting {
+    #if os(iOS)
+    // Documents: visible in the Files app (UIFileSharingEnabled) and shareable.
+    static let logURL = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("orbeat.jsonl")
+    #else
     static let logURL = FileManager.default
         .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Orbeat/orbeat.jsonl")
+    #endif
 
     /// Master toggle, persisted.
     @Published var recording = UserDefaults.standard.bool(forKey: "duckdbLog") {

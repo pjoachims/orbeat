@@ -19,6 +19,8 @@ targets:
       - path: ../Sources/Model
       - path: ../Sources/Ble
       - path: ../Sources/Drivers
+      - path: ../Sources/UI
+      - path: ../Sources/Recorder
     dependencies:
       - target: OrbeatWidget
     info:
@@ -30,6 +32,8 @@ targets:
         NSSupportsLiveActivitiesFrequentUpdates: true
         NSBluetoothAlwaysUsageDescription: Orbeat reads live heart rate and power from nearby Bluetooth sensors.
         UIBackgroundModes: [bluetooth-central, bluetooth-peripheral]
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vibecode.orbeat.ios

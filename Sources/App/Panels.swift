@@ -7,35 +7,46 @@ extension AppDelegate {
         guard let button = statusItem.button else { return }
         let over = model.overThreshold
         let heartColor = over ? NSColor.white : NSColor(red: 1.0, green: 0.22, blue: 0.37, alpha: 1)
-        let glyphAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13)]
+        let valueColor = over ? NSColor.white : NSColor.labelColor
         let valueAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold),
-            .foregroundColor: over ? NSColor.white : NSColor.labelColor]
-        var segs: [(glyph: String, value: String, color: NSColor?)] = []
-        if model.barMetrics.contains("heart") { segs.append(("♥ ", model.bpmText, heartColor)) }
+            .foregroundColor: valueColor]
+        var segs: [(symbol: String, value: String, color: NSColor)] = []
+        if model.barMetrics.contains("heart") { segs.append(("heart.fill", model.bpmText, heartColor)) }
         if model.barMetrics.contains("power") {
-            segs.append(("⚡", model.displayWatts.map { "\($0)" } ?? "––", nil))
+            segs.append(("bolt.fill", model.displayWatts.map { "\($0)" } ?? "––", valueColor))
         }
         if model.barMetrics.contains("rpm") {
-            segs.append(("⟳ ", model.displayCadence.map { "\($0)" } ?? "––", nil))
+            segs.append(("arrow.trianglehead.2.clockwise.rotate.90",
+                         model.displayCadence.map { "\($0)" } ?? "––", valueColor))
         }
         if model.barMetrics.contains("speed") {
-            segs.append(("≫ ", model.displaySpeedKmh.map { String(format: "%.1f", $0) } ?? "––", nil))
+            segs.append(("gauge.with.needle", model.displaySpeedKmh.map { String(format: "%.1f", $0) } ?? "––", valueColor))
         }
-        if segs.isEmpty { segs = [("♥ ", model.bpmText, heartColor)] }   // never a blank bar
+        if segs.isEmpty { segs = [("heart.fill", model.bpmText, heartColor)] }   // never a blank bar
         let s = NSMutableAttributedString()
         for (idx, seg) in segs.enumerated() {
-            if idx > 0 { s.append(NSAttributedString(string: "  ", attributes: valueAttrs)) }
-            var ga = glyphAttrs
-            if let c = seg.color { ga[.foregroundColor] = c }
-            s.append(NSAttributedString(string: seg.glyph, attributes: ga))
-            s.append(NSAttributedString(string: seg.value, attributes: valueAttrs))
+            if idx > 0 { s.append(NSAttributedString(string: "   ", attributes: valueAttrs)) }
+            s.append(Self.symbol(seg.symbol, color: seg.color))
+            s.append(NSAttributedString(string: " " + seg.value, attributes: valueAttrs))
         }
         button.attributedTitle = s
         button.wantsLayer = true
         button.layer?.cornerRadius = 4
         button.layer?.backgroundColor = over ? NSColor.systemRed.cgColor : nil
         updateWarningHUD()
+    }
+
+    /// An SF Symbol as an inline text attachment, tinted, baseline-aligned to 13 pt text.
+    private static func symbol(_ name: String, color: NSColor) -> NSAttributedString {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 11, weight: .bold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg) else { return NSAttributedString(string: "") }
+        let a = NSTextAttachment()
+        a.image = img
+        a.bounds = CGRect(x: 0, y: -2, width: img.size.width, height: img.size.height)
+        return NSAttributedString(attachment: a)
     }
 
     func updateWarningHUD() {
@@ -78,10 +89,13 @@ extension AppDelegate {
             return
         }
         let host = NSHostingController(rootView:
-            HeartCard(model: model, compact: false)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 22)))
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 288, height: 360),
+            HeartCard(model: model, compact: false,
+                      onStep: { [weak self] in self?.applyRidePress([$0]) })
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(.primary.opacity(0.08), lineWidth: 1)))
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 312, height: 400),
                             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
                             backing: .buffered, defer: false)
         panel.titleVisibility = .hidden

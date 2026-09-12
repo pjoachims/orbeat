@@ -11,4 +11,5 @@ enum SensorEvent {
     case handlebar([HandlebarInput])       // fresh paddle presses
     case trainerReady                      // FTMS control point discovered & claimed
     case trainerLost
+    case trainerMode(TrainerMode)          // trainer reported its target (set by any client)
 }

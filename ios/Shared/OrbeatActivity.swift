@@ -17,9 +17,9 @@ struct OrbeatAttributes: ActivityAttributes {
 /// target doesn't compile (it drags in Combine/UserDefaults state it can't use).
 func orbeatZoneColor(_ bpm: Int) -> Color {
     switch bpm {
-    case ..<60: return Color(red: 0.18, green: 0.82, blue: 0.35)
-    case ..<100: return Color(red: 1.0, green: 0.62, blue: 0.04)
-    case ..<140: return Color(red: 1.0, green: 0.22, blue: 0.37)
-    default: return Color(red: 0.74, green: 0.35, blue: 0.95)
+    case ..<60: return Color(red: 0.50, green: 0.65, blue: 1.0)    // Resting  #7FA6FF
+    case ..<100: return Color(red: 0.30, green: 0.85, blue: 0.48)  // Fat Burn #4DD97B
+    case ..<140: return Color(red: 1.0, green: 0.69, blue: 0.13)   // Cardio   #FFB020
+    default: return Color(red: 1.0, green: 0.22, blue: 0.37)       // Peak = brand red
     }
 }

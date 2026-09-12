@@ -43,7 +43,7 @@ extension AppDelegate {
         let shareItem = NSMenuItem(title: "Share Sensors via Bluetooth",
                                    action: #selector(toggleRebroadcast), keyEquivalent: "")
         shareItem.target = self
-        shareItem.state = (ble?.rebroadcaster.enabled ?? false) ? .on : .off
+        shareItem.state = (ble?.proxy.enabled ?? false) ? .on : .off
         menu.addItem(shareItem)
         let logItem = NSMenuItem(title: "Log to DuckDB (JSONL)",
                                  action: #selector(toggleDuckDBLog), keyEquivalent: "")
@@ -74,7 +74,7 @@ extension AppDelegate {
     }
 
     @objc func toggleRebroadcast() {
-        ble?.rebroadcaster.enabled.toggle()
+        ble?.proxy.enabled.toggle()
     }
 
     @objc func harder() { applyRidePress([.shiftUp]) }
@@ -197,25 +197,5 @@ private extension NSMenu {
         sub.addItem(custom)
         thresholdItem.submenu = sub
         addItem(thresholdItem)
-    }
-}
-
-extension TrainerMode {
-    /// Human-readable current target, for menus and HUDs.
-    var label: String {
-        switch self {
-        case .erg(let w): return "ERG · \(w) W"
-        case .resistance(let p): return "Resistance · \(p) %"
-        case .sim(let g): return String(format: "Sim · %.1f %%", Double(g) / 100)
-        }
-    }
-
-    /// Label for one step in this mode, e.g. "+10 W".
-    var stepLabel: String {
-        switch self {
-        case .erg: return "+10 W"
-        case .resistance: return "+10 %"
-        case .sim: return "+1 %"
-        }
     }
 }

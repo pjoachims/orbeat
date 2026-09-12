@@ -9,8 +9,6 @@ protocol EquipmentDriver: AnyObject {
     var scannedServices: [CBUUID] { get }
     /// Advertisement-level match (name heuristics allowed, e.g. "zwift").
     func matches(_ name: String?, advertisedServices: [CBUUID]) -> Bool
-    /// Characteristics to subscribe to on a given service ([] if unknown service).
-    func notifyCharacteristics(forService uuid: CBUUID) -> [CBUUID]
     /// Called once per discovered characteristic: subscribe, handshakes,
     /// control-point claims. May return immediate events.
     func characteristicDiscovered(_ peripheral: CBPeripheral,

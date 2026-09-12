@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		00A22A8C72C7E3B7895CD538 /* Readings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DF74897E3190F1195979B8 /* Readings.swift */; };
+		03FFF517CA7D3C434DD7D6E0 /* SessionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 090D8BB9105145CC127B93F2 /* SessionViews.swift */; };
 		045298A1EA6E60A8579A8170 /* RideModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4A5BA5443727E69A1FBFE3 /* RideModel.swift */; };
 		07D6E6E5CECE2712FEC9DACB /* HeartRateParse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890E032E38EEFBCA4CCD910E /* HeartRateParse.swift */; };
 		3067A528D85A2BFCC66EDADE /* OrbeatActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */; };
@@ -15,19 +16,24 @@
 		399A39C5566AEFF398473F21 /* HeartRateDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F460AB0E81441391CDD2B6F /* HeartRateDriver.swift */; };
 		3F300C97BF5FC11B0A4BBA5E /* OrbeatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */; };
 		4B8A576971EBEC1880927B25 /* CyclingPower.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D0EC4E0FA33B31AC259AD7F /* CyclingPower.swift */; };
+		5309662D0FB0741252796DAD /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B39B63BAC61483932F4AF2F /* SessionStore.swift */; };
 		544C3FD36DCA786E8355A8A4 /* Driver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7708D307C98D5AAFE9B42DF /* Driver.swift */; };
 		5D7F7F84B1AD8F12BCFD3FDF /* ButtonDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334D6A7A7BCD4C6AA8DDEFAB /* ButtonDecoder.swift */; };
 		612DB140873E6E5CBD3FDC6E /* OrbeatWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		62FA0CDEC983C70C6A884D97 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9DFA4DBBA040C33619C10B /* Theme.swift */; };
 		6E2AF45C2641FCD83481484D /* OrbeatActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */; };
 		6E7E8A72F4C64842F1FE106A /* SensorEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7BE0EA9053CDEC90E27D8F3 /* SensorEvent.swift */; };
 		6F0167E17F44B672BA715440 /* ZwiftButtonFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E8F93C858F877C795C94683 /* ZwiftButtonFrame.swift */; };
 		760B187D4989F076873DD268 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */; };
+		8BA711F1A2D4E5EA9C5DC138 /* RideModel+Events.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B2C10E2A70A33BB34BA8D4 /* RideModel+Events.swift */; };
 		8BEFAF166658628F167E6F9D /* RideButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1287363B0CC3B6D68A14FC /* RideButtons.swift */; };
+		97C584BECE9FE1382989F1AC /* Recorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6BF4A5C720FC31AA4483A8E /* Recorder.swift */; };
 		9B591A6CB341BC1B1D0D8E28 /* TrainerMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDD0BD1290306C451D92A78 /* TrainerMode.swift */; };
-		9D771C82AA1C172D4FCAC558 /* Rebroadcast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC65AA44BD2465F91D9C0A7 /* Rebroadcast.swift */; };
 		BE4092420E68BBD851CDC718 /* FtmsIndoorBike.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F5E45BCE5F80822FA2EE0D /* FtmsIndoorBike.swift */; };
 		C7C193F6C811290BB653AD76 /* OrbeatWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D18B526DA33C2A14775665 /* OrbeatWidget.swift */; };
 		D40D65981938F3DC7E0A7C63 /* PowerDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B62E83B42C8F5C320E5C9CB9 /* PowerDriver.swift */; };
+		D62FFB44B06F7EB83B65D33A /* FtmsMachineStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34AE303BA03E3782382A1B71 /* FtmsMachineStatus.swift */; };
+		D8730B320CDE8310082E18F8 /* GattProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C58A626DBA052277708EC8 /* GattProxy.swift */; };
 		FDB4C66DCBF152A34D5252CB /* BleHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFD1FE26B4F09795F3E87F7D /* BleHub.swift */; };
 /* End PBXBuildFile section */
 
@@ -57,13 +63,16 @@
 
 /* Begin PBXFileReference section */
 		03C3CA330F870BE118C8C64C /* OrbeatActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatActivity.swift; sourceTree = "<group>"; };
+		090D8BB9105145CC127B93F2 /* SessionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionViews.swift; sourceTree = "<group>"; };
 		19F5E45BCE5F80822FA2EE0D /* FtmsIndoorBike.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FtmsIndoorBike.swift; sourceTree = "<group>"; };
 		1C1287363B0CC3B6D68A14FC /* RideButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideButtons.swift; sourceTree = "<group>"; };
 		1D0EC4E0FA33B31AC259AD7F /* CyclingPower.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CyclingPower.swift; sourceTree = "<group>"; };
 		23D82D25CD6C87DCC729FCD3 /* FtmsControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FtmsControl.swift; sourceTree = "<group>"; };
 		334D6A7A7BCD4C6AA8DDEFAB /* ButtonDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonDecoder.swift; sourceTree = "<group>"; };
+		34AE303BA03E3782382A1B71 /* FtmsMachineStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FtmsMachineStatus.swift; sourceTree = "<group>"; };
+		3B39B63BAC61483932F4AF2F /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		47C58A626DBA052277708EC8 /* GattProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GattProxy.swift; sourceTree = "<group>"; };
 		4F460AB0E81441391CDD2B6F /* HeartRateDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeartRateDriver.swift; sourceTree = "<group>"; };
-		5CC65AA44BD2465F91D9C0A7 /* Rebroadcast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rebroadcast.swift; sourceTree = "<group>"; };
 		646A37EDB88E069642C3DD00 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6D3C5E057A0853CBC8F65ACE /* OrbeatWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = OrbeatWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -76,7 +85,10 @@
 		B62E83B42C8F5C320E5C9CB9 /* PowerDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerDriver.swift; sourceTree = "<group>"; };
 		B7708D307C98D5AAFE9B42DF /* Driver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Driver.swift; sourceTree = "<group>"; };
 		C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatApp.swift; sourceTree = "<group>"; };
+		CA9DFA4DBBA040C33619C10B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		CFDD0BD1290306C451D92A78 /* TrainerMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainerMode.swift; sourceTree = "<group>"; };
+		E2B2C10E2A70A33BB34BA8D4 /* RideModel+Events.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RideModel+Events.swift"; sourceTree = "<group>"; };
+		E6BF4A5C720FC31AA4483A8E /* Recorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recorder.swift; sourceTree = "<group>"; };
 		E7BE0EA9053CDEC90E27D8F3 /* SensorEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorEvent.swift; sourceTree = "<group>"; };
 		E8DF74897E3190F1195979B8 /* Readings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Readings.swift; sourceTree = "<group>"; };
 		F1D18B526DA33C2A14775665 /* OrbeatWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbeatWidget.swift; sourceTree = "<group>"; };
@@ -99,6 +111,7 @@
 			children = (
 				1D0EC4E0FA33B31AC259AD7F /* CyclingPower.swift */,
 				19F5E45BCE5F80822FA2EE0D /* FtmsIndoorBike.swift */,
+				34AE303BA03E3782382A1B71 /* FtmsMachineStatus.swift */,
 				4F460AB0E81441391CDD2B6F /* HeartRateDriver.swift */,
 				890E032E38EEFBCA4CCD910E /* HeartRateParse.swift */,
 				B62E83B42C8F5C320E5C9CB9 /* PowerDriver.swift */,
@@ -133,6 +146,7 @@
 				73D9E4254C23ECCEF4FAE1A4 /* Assets.xcassets */,
 				646A37EDB88E069642C3DD00 /* Info.plist */,
 				C0C050C0904E4CBA69ADDD6E /* OrbeatApp.swift */,
+				090D8BB9105145CC127B93F2 /* SessionViews.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -145,7 +159,9 @@
 				33CC2BA56E49FA7EDF801A35 /* Core */,
 				02C5321AF71941D6930860E2 /* Drivers */,
 				D45E74EA0318C53BAA62EDFC /* Model */,
+				FB1BE75D8751D308E30C26A8 /* Recorder */,
 				BD2B9080708B7A21A5E2AF6E /* Shared */,
+				FEAEEDA32D82D2677D70DF9F /* UI */,
 				92571719749A1214694565C6 /* Widget */,
 				AE557A3DB3AE962934C2DBA6 /* Products */,
 			);
@@ -182,7 +198,7 @@
 			children = (
 				AFD1FE26B4F09795F3E87F7D /* BleHub.swift */,
 				23D82D25CD6C87DCC729FCD3 /* FtmsControl.swift */,
-				5CC65AA44BD2465F91D9C0A7 /* Rebroadcast.swift */,
+				47C58A626DBA052277708EC8 /* GattProxy.swift */,
 			);
 			name = Ble;
 			path = ../Sources/Ble;
@@ -192,9 +208,29 @@
 			isa = PBXGroup;
 			children = (
 				9A4A5BA5443727E69A1FBFE3 /* RideModel.swift */,
+				E2B2C10E2A70A33BB34BA8D4 /* RideModel+Events.swift */,
+				3B39B63BAC61483932F4AF2F /* SessionStore.swift */,
 			);
 			name = Model;
 			path = ../Sources/Model;
+			sourceTree = "<group>";
+		};
+		FB1BE75D8751D308E30C26A8 /* Recorder */ = {
+			isa = PBXGroup;
+			children = (
+				E6BF4A5C720FC31AA4483A8E /* Recorder.swift */,
+			);
+			name = Recorder;
+			path = ../Sources/Recorder;
+			sourceTree = "<group>";
+		};
+		FEAEEDA32D82D2677D70DF9F /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				CA9DFA4DBBA040C33619C10B /* Theme.swift */,
+			);
+			name = UI;
+			path = ../Sources/UI;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -298,16 +334,22 @@
 				544C3FD36DCA786E8355A8A4 /* Driver.swift in Sources */,
 				33595C12D61B8E1CCC71624C /* FtmsControl.swift in Sources */,
 				BE4092420E68BBD851CDC718 /* FtmsIndoorBike.swift in Sources */,
+				D62FFB44B06F7EB83B65D33A /* FtmsMachineStatus.swift in Sources */,
+				D8730B320CDE8310082E18F8 /* GattProxy.swift in Sources */,
 				399A39C5566AEFF398473F21 /* HeartRateDriver.swift in Sources */,
 				07D6E6E5CECE2712FEC9DACB /* HeartRateParse.swift in Sources */,
 				6E2AF45C2641FCD83481484D /* OrbeatActivity.swift in Sources */,
 				3F300C97BF5FC11B0A4BBA5E /* OrbeatApp.swift in Sources */,
 				D40D65981938F3DC7E0A7C63 /* PowerDriver.swift in Sources */,
 				00A22A8C72C7E3B7895CD538 /* Readings.swift in Sources */,
-				9D771C82AA1C172D4FCAC558 /* Rebroadcast.swift in Sources */,
+				97C584BECE9FE1382989F1AC /* Recorder.swift in Sources */,
 				8BEFAF166658628F167E6F9D /* RideButtons.swift in Sources */,
+				8BA711F1A2D4E5EA9C5DC138 /* RideModel+Events.swift in Sources */,
 				045298A1EA6E60A8579A8170 /* RideModel.swift in Sources */,
 				6E7E8A72F4C64842F1FE106A /* SensorEvent.swift in Sources */,
+				5309662D0FB0741252796DAD /* SessionStore.swift in Sources */,
+				03FFF517CA7D3C434DD7D6E0 /* SessionViews.swift in Sources */,
+				62FA0CDEC983C70C6A884D97 /* Theme.swift in Sources */,
 				9B591A6CB341BC1B1D0D8E28 /* TrainerMode.swift in Sources */,
 				6F0167E17F44B672BA715440 /* ZwiftButtonFrame.swift in Sources */,
 			);

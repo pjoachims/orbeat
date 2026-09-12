@@ -6,14 +6,32 @@ import UIKit
 @main
 struct OrbeatApp: App {
     @StateObject private var model = RideModel()
+    @StateObject private var store = SessionStore()
     var body: some Scene {
-        WindowGroup { ContentView(model: model) }
+        WindowGroup {
+            TabView {
+                ContentView(model: model, store: store)
+                    .tabItem { Label("Live", systemImage: "heart.fill") }
+                SessionsTab(store: store)
+                    .tabItem { Label("Sessions", systemImage: "chart.xyaxis.line") }
+            }
+            .preferredColorScheme(.dark)
+            // Root-level: a tab's own .task is cancelled when it's switched away.
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(1))
+                    store.tick(model)
+                }
+            }
+        }
     }
 }
 
 struct ContentView: View {
     @ObservedObject var model: RideModel
     @State private var ble: BLEManager?
+    @StateObject private var recorder = Recorder()
+    @ObservedObject var store: SessionStore
     @State private var activity: Activity<OrbeatAttributes>?
     @State private var showDevices = false
     /// Vibrate/notify every N seconds while over threshold; 0 = off.
@@ -30,63 +48,126 @@ struct ContentView: View {
               over: model.overThreshold)
     }
 
+    private var live: Bool { model.hasData && model.isFresh }
+    private var zone: Color { live ? rideZoneColor(model.bpm) : .secondary }
+
     var body: some View {
-        VStack(spacing: 28) {
-            Spacer()
-            VStack(spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 34))
-                        .foregroundStyle(orbeatZoneColor(model.bpm))
-                    Text(model.bpmText)
-                        .font(.system(size: 76, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                }
-                Text(model.hasData && model.isFresh ? model.zone : model.bleStatus)
-                    .font(.callout.weight(.medium))
+        VStack(alignment: .leading, spacing: 0) {
+            // top bar
+            HStack(alignment: .firstTextBaseline) {
+                Text("ORBEAT").font(.system(size: 12, weight: .bold)).kerning(2.2)
+                Spacer()
+                LiveDot(live: model.isFresh)
+            }
+            Text(model.hasData ? model.sourceName : model.bleStatus)
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .padding(.top, 3)
+
+            Spacer(minLength: 12)
+
+            // hero
+            HStack(alignment: .center, spacing: 10) {
+                BeatingHeart(bpm: model.bpm, live: live, size: 32, color: zone)
+                    .padding(.top, 8)   // glyph box centre sits a touch above the digits' centre
+              HStack(alignment: .lastTextBaseline, spacing: 10) {
+                Text(model.bpmText)
+                    .font(.system(size: 116, weight: .semibold))
+                    .monospacedDigit()
+                    .kerning(-6)
+                    .contentTransition(.numericText())
+                    .animation(.spring(duration: 0.4), value: model.bpm)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .layoutPriority(1)
+                Text("BPM")
+                    .font(.system(size: 15, weight: .semibold))
+                    .kerning(0.5)
                     .foregroundStyle(.secondary)
+                    .padding(.bottom, 20)
+              }
             }
-            HStack(spacing: 32) {
-                metric("bolt.fill", model.displayWatts.map { "\($0) W" } ?? "–– W")
-                metric("arrow.clockwise", model.displayCadence.map { "\($0) rpm" } ?? "–– rpm")
-            }
-            Spacer()
-            Button {
-                activity == nil ? startActivity() : endActivity()
-            } label: {
-                Text(activity == nil ? "Show in Dynamic Island" : "Hide from Dynamic Island")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-            }
-            .buttonStyle(.borderedProminent)
-            .padding(.horizontal, 24)
+            ZoneChip(model: model)
+
+            Sparkline(history: model.history, tint: zone)
+                .frame(height: 84)
+                .padding(.top, 18)
+                .opacity(live ? 1 : 0.35)
+
+            Spacer(minLength: 16)
+
             HStack(spacing: 8) {
-                Text("Alert at")
+                MetricTile(label: "Watts", value: wattsTxt, valueSize: 26, padding: 14)
+                MetricTile(label: "RPM", value: cadenceTxt, valueSize: 26, padding: 14)
+                MetricTile(label: "km/h", value: speedTxt, valueSize: 26, padding: 14)
+            }
+            if model.trainerControllable {
+                TrainerStepper(mode: model.trainerMode, padding: 14) { applyRidePress([$0]) }
+                    .padding(.top, 8)
+            }
+
+            SessionBar(store: store)
+                .padding(.top, 8)
+
+            Spacer(minLength: 16)
+
+            // alert
+            HStack(spacing: 10) {
+                Text("Alert at").foregroundStyle(.secondary)
                 TextField("off", value: Binding(
                     get: { model.threshold == 0 ? nil : model.threshold },
                     set: { model.threshold = $0 ?? 0 }
                 ), format: .number)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.center)
-                    .frame(width: 64)
-                Text("bpm")
+                    .monospacedDigit()
+                    .frame(width: 56)
+                    .padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(.primary.opacity(0.08)))
+                Text("bpm").foregroundStyle(.secondary)
+                Spacer()
                 Picker("Vibrate", selection: $vibrateEvery) {
-                    Text("No vibration").tag(0)
-                    ForEach([5, 10, 30, 60], id: \.self) { Text("Vibrate \($0)s").tag($0) }
+                    Text("No buzz").tag(0)
+                    ForEach([5, 10, 30, 60], id: \.self) { Text("Buzz \($0)s").tag($0) }
                 }
                 .tint(.secondary)
+                .fixedSize()
             }
-            .foregroundStyle(.secondary)
-            Button("Connect Equipment") { showDevices = true }
-                .font(.subheadline)
-            Text(model.sourceName)
-                .font(.footnote)
-                .foregroundStyle(.tertiary)
-                .padding(.bottom, 12)
+            .font(.subheadline)
+            .padding(.bottom, 6)
+
+            // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
+            HStack(spacing: 10) {
+                Toggle(isOn: $recorder.recording) {
+                    Label("Log ride", systemImage: "record.circle")
+                        .foregroundStyle(recorder.recording ? orbeatRed : .secondary)
+                }
+                .toggleStyle(.button)
+                .buttonStyle(.plain)
+                Spacer()
+                ShareLink(item: Recorder.logURL) {
+                    Label("orbeat.jsonl", systemImage: "square.and.arrow.up")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .font(.subheadline)
+            .padding(.bottom, 10)
+
+            HStack(spacing: 8) {
+                action(activity == nil ? "Dynamic Island" : "Hide Island",
+                       activity == nil ? "circle.dashed" : "circle.dashed.inset.filled") {
+                    activity == nil ? startActivity() : endActivity()
+                }
+                action("Equipment", "antenna.radiowaves.left.and.right") { showDevices = true }
+            }
         }
+        .padding(.horizontal, 22)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(Color(red: 0.043, green: 0.043, blue: 0.059).ignoresSafeArea())
         .sheet(isPresented: $showDevices) { DeviceSheet(ble: ble, model: model) }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -114,11 +195,20 @@ struct ContentView: View {
         }
     }
 
-    private func metric(_ icon: String, _ text: String) -> some View {
-        Label(text, systemImage: icon)
-            .font(.title3.weight(.semibold))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
+    private var wattsTxt: String { model.displayWatts.map { "\($0)" } ?? "––" }
+    private var cadenceTxt: String { model.displayCadence.map { "\($0)" } ?? "––" }
+    private var speedTxt: String { model.displaySpeedKmh.map { String(format: "%.1f", $0) } ?? "––" }
+
+    private func action(_ title: String, _ symbol: String, _ run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.primary.opacity(0.08)))
+        }
+        .buttonStyle(.plain)
     }
 
     private func startActivity() {
@@ -173,6 +263,8 @@ struct ContentView: View {
     private func feed() async {
         #if targetEnvironment(simulator)
         model.setLive(true, source: "Simulated ride")
+        model.trainerControllable = true
+        model.trainerMode = .sim(grade: model.grade)
         var bpm = 128.0, watts = 210.0
         while !Task.isCancelled {
             bpm = min(174, max(96, bpm + .random(in: -4...5)))
@@ -180,42 +272,18 @@ struct ContentView: View {
             model.ingest(Int(bpm))
             model.watts = Int(watts)
             model.cadence = Int.random(in: 84...96)
+            model.speedKmh = watts / 6.4
             try? await Task.sleep(for: .seconds(1.1))
         }
         #else
         guard ble == nil else { return }
-        let manager = BLEManager()
-        manager.onEvent = { [weak self] event in
-            guard let self else { return }
-            self.apply(event, to: self.model)
-        }
+        let manager = BLEManager(log: recorder)
+        manager.onEvent = { [model] in model.apply($0, ble: manager) }
         ble = manager
         #endif
     }
 
-    /// Map component events onto the shared model (composition root).
-    private func apply(_ event: SensorEvent, to model: RideModel) {
-        switch event {
-        case .status(let s): model.bleStatus = s
-        case .heartLinkUp(let device): model.setLive(true, source: device)
-        case .heartLinkDown: model.setLive(false, source: "Disconnected")
-        case .powerLinkUp(let device): model.powerSource = device
-        case .powerLinkDown:
-            model.watts = nil
-            model.cadence = nil
-            model.speedKmh = nil
-            model.powerSource = ""
-        case .heartRate(let r):
-            if r.bpm > 0 { model.ingest(r.bpm) }
-        case .power(let p):
-            model.watts = p.watts
-            model.touch()
-            model.speedKmh = p.kmh
-            model.cadence = p.cadence
-        case .handlebar, .trainerReady, .trainerLost:
-            break   // no trainer UI on iOS yet
-        }
-    }
+    private func applyRidePress(_ inputs: [HandlebarInput]) { model.press(inputs, ble: ble) }
 }
 
 /// Discovered-sensor list — the iOS stand-in for the macOS "Connect Equipment" menu.
@@ -234,8 +302,8 @@ struct DeviceSheet: View {
                 if let ble {
                     Section(footer: Text("Other devices (Zwift, Apple TV, another Mac) can pair with “Orbeat” as a heart-rate/power sensor.")) {
                         Toggle("Share sensors via Bluetooth", isOn: Binding(
-                            get: { ble.rebroadcaster.enabled },
-                            set: { ble.rebroadcaster.enabled = $0; tick += 1 }))
+                            get: { ble.proxy.enabled },
+                            set: { ble.proxy.enabled = $0; tick += 1 }))
                     }
                     Section(footer: Text(model.bleStatus)) {
                         if ble.discovered.isEmpty {
@@ -281,9 +349,11 @@ struct DeviceSheet: View {
     private func row(_ ble: BLEManager, _ d: BLEManager.Device) -> some View {
         Button { ble.connect(d) } label: {
             HStack {
-                Image(systemName: d.isSensor ? (d.isPower ? "bolt.fill" : "heart.fill")
-                                             : "questionmark.circle")
-                    .foregroundStyle(d.isSensor ? (d.isPower ? .yellow : .red) : .secondary)
+                Image(systemName: d.isRide ? "gamecontroller.fill"
+                                  : d.isSensor ? (d.isPower ? "bolt.fill" : "heart.fill")
+                                  : "questionmark.circle")
+                    .foregroundStyle(d.isRide ? .blue
+                                     : d.isSensor ? (d.isPower ? .yellow : .red) : .secondary)
                 VStack(alignment: .leading) {
                     Text(d.name).foregroundStyle(.primary)
                     if ble.isKnown(d) {

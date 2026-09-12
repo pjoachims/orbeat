@@ -15,6 +15,7 @@ swiftc -O \
   Sources/Core/RideButtons.swift \
   Sources/Drivers/Standard/CyclingPower.swift \
   Sources/Drivers/Standard/FtmsIndoorBike.swift \
+  Sources/Drivers/Standard/FtmsMachineStatus.swift \
   Sources/Drivers/Standard/HeartRateParse.swift \
   Sources/Drivers/Zwift/ZwiftButtonFrame.swift \
   Sources/Drivers/Zwift/ButtonDecoder.swift \

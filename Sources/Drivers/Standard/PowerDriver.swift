@@ -26,17 +26,6 @@ final class PowerDriver: EquipmentDriver {
         advertisedServices.contains(Self.powerService) && !advertisedServices.contains(HeartRateDriver.hrService)
     }
 
-    func notifyCharacteristics(forService uuid: CBUUID) -> [CBUUID] {
-        switch uuid {
-        case Self.powerService:
-            return [Self.powerMeasurement]
-        case Trainer.service:
-            return [Self.ftmsIndoorBikeData]
-        default:
-            return []
-        }
-    }
-
     func characteristicDiscovered(_ peripheral: CBPeripheral,
                                   _ characteristic: CBCharacteristic) -> [SensorEvent] {
         if characteristic.uuid == Self.powerMeasurement {
@@ -45,11 +34,12 @@ final class PowerDriver: EquipmentDriver {
             return [.powerLinkUp(device: peripheral.name ?? "Power meter")]
         }
         if characteristic.uuid == Self.ftmsIndoorBikeData {
-            if characteristic.properties.contains(.notify) {
+            // CPS devices: their FTMS stream is ignored in handle(), so don't
+            // subscribe — through a bridge it only competes with 2A63 for the
+            // phone's notify queue.
+            if characteristic.properties.contains(.notify), !cpsDevices.contains(peripheral.identifier) {
                 peripheral.setNotifyValue(true, for: characteristic)
-                if !cpsDevices.contains(peripheral.identifier) {
-                    return [.powerLinkUp(device: peripheral.name ?? "Trainer")]
-                }
+                return [.powerLinkUp(device: peripheral.name ?? "Trainer")]
             }
         }
         return []

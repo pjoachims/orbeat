@@ -18,10 +18,6 @@ final class HeartRateDriver: EquipmentDriver {
         advertisedServices.contains(Self.hrService)
     }
 
-    func notifyCharacteristics(forService uuid: CBUUID) -> [CBUUID] {
-        uuid == Self.hrService ? [Self.hrMeasurement] : []
-    }
-
     func characteristicDiscovered(_ peripheral: CBPeripheral,
                                   _ characteristic: CBCharacteristic) -> [SensorEvent] {
         guard characteristic.uuid == Self.hrMeasurement else { return [] }

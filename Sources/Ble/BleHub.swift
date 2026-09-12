@@ -17,6 +17,9 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     struct Device {
         let peripheral: CBPeripheral
         let isPower: Bool
+        /// Another Orbeat relaying HR + power + trainer control (advertises
+        /// 180D and 1818 together). Takes the power slot once 1818 is discovered.
+        var isBridge: Bool = false
         /// A Zwift Play/Ride handlebar controller — an input device, not a sensor.
         var isRide: Bool = false
         /// Advertised a standard HR/power service. False only for devices found
@@ -27,8 +30,8 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         var name: String { peripheral.name ?? advName ?? "Unknown device" }
     }
 
-    /// Optional bridge mode: relay received packets out as a BLE peripheral.
-    let rebroadcaster = Rebroadcaster()
+    /// Optional bridge mode: mirror every connected sensor as a local BLE peripheral.
+    let proxy = GattProxy()
 
     private var central: CBCentralManager!
     private var hrPeripheral: CBPeripheral?
@@ -93,6 +96,9 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         } else {
             if let p = hrPeripheral, p !== d.peripheral { central.cancelPeripheralConnection(p) }
             hrPeripheral = d.peripheral
+            // A bridge takes the power slot too — but only once discovery
+            // proves 1818 (didDiscoverServices), not here: a bonded phone
+            // accepts the link even with Orbeat closed, GATT table empty.
         }
         d.peripheral.delegate = self
         emit(.status("Connecting \(d.name)…"))
@@ -111,6 +117,14 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         self.drivers = [heartDriver, powerDriver]
         super.init()
         lookup = { [weak self] peripheral in self?.deviceName(peripheral) }
+        proxy.onLog = { [weak self] in self?.log($0) }
+        // A downstream Orbeat set a target through us: the trainer won't tell
+        // us (it only notifies the OTHER centrals), so learn it from the write.
+        proxy.onDownstreamWrite = { [weak self] uuid, data in
+            guard uuid == Trainer.controlPoint, let m = FtmsControlFrame.parse([UInt8](data)) else { return }
+            self?.trainer.observed(m)
+            self?.emit(.trainerMode(m))
+        }
         central = CBCentralManager(delegate: self, queue: .main,
                                    options: [CBCentralManagerOptionShowPowerAlertKey: true])
     }
@@ -135,6 +149,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     // MARK: Central lifecycle
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        log(["src": "ble", "ev": "centralState", "state": central.state.rawValue])
         switch central.state {
         case .poweredOn:
             emit(.status("Scanning…"))
@@ -150,28 +165,37 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        let advertised = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
+        // iOS moves a backgrounded app's service UUIDs into the overflow area.
+        let advertised = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? [])
+            + (advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? [])
         let advName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         // Zwift Ride/Play advertise the service UUID only in the scan response, so
         // advertisementData often omits it — fall back to the name.
         let nameHit = (peripheral.name ?? advName ?? "").localizedCaseInsensitiveContains("zwift")
         let isRide = advertised.contains(ZwiftRideController.service) || nameHit
         let isPower = powerDriver.matches(peripheral.name ?? advName, advertisedServices: advertised)
+        let isBridge = advertised.contains(HeartRateDriver.hrService)
+            && advertised.contains(PowerDriver.powerService)
         // Filtered scans imply a sensor even when the callback omits the service list.
         let isSensor = !scanningAll || advertised.contains(HeartRateDriver.hrService)
             || advertised.contains(PowerDriver.powerService) || isRide
         if !isSensor && peripheral.name == nil && advName == nil { return }   // skip anonymous junk in search-all
         if !discovered.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
-            discovered.append(Device(peripheral: peripheral, isPower: isPower, isRide: isRide,
-                                     isSensor: isSensor, advName: advName))
+            log(["src": "ble", "ev": "found", "name": peripheral.name ?? advName ?? "?",
+                 "adv": advertised.map { $0.uuidString }])
+            discovered.append(Device(peripheral: peripheral, isPower: isPower, isBridge: isBridge,
+                                     isRide: isRide, isSensor: isSensor, advName: advName))
         }
         // Auto-connect only devices the user has connected before; new ones
-        // wait in the "Connect Equipment" menu.
+        // wait in the "Connect Equipment" menu. A known bridge (the phone) is
+        // preferred over a direct trainer link: one hop, phone owns the bike.
+        // ponytail: a Mac and a phone that both rebroadcast AND know each other
+        // would relay in a loop — don't "Connect" your own Mac from the phone.
         let slotFree = isRide ? ridePeripheral == nil
                      : isPower ? powerPeripheral == nil : hrPeripheral == nil
         guard isSensor, slotFree else { return }
         if known.contains(peripheral.identifier.uuidString) {
-            connect(Device(peripheral: peripheral, isPower: isPower, isRide: isRide))
+            connect(Device(peripheral: peripheral, isPower: isPower, isBridge: isBridge, isRide: isRide))
         } else {
             emit(.status("Found \(peripheral.name ?? "device") — right-click → Connect Equipment"))
         }
@@ -185,6 +209,12 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
+        // Free the slot `connect()` claimed, or a dead known device (e.g. a
+        // Fitbit that dropped its pairing) blocks every other sensor forever.
+        if peripheral === hrPeripheral { hrPeripheral = nil }
+        if peripheral === powerPeripheral { powerPeripheral = nil }
+        if peripheral === ridePeripheral { ridePeripheral = nil }
+        emit(.status("Couldn't connect \(peripheral.name ?? "device") · rescanning…"))
         log(["src": "ble", "ev": "failToConnect", "name": peripheral.name ?? "?",
              "err": error?.localizedDescription ?? ""])
     }
@@ -207,6 +237,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             ridePeripheral = nil
             buttonDecode.reset()
         }
+        proxy.unmirror(peripheral)
         log(["src": "ble", "ev": "disconnected", "name": peripheral.name ?? "?",
              "err": error?.localizedDescription ?? ""])
         scan()
@@ -218,27 +249,38 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         log(["src": "ble", "ev": "services", "name": peripheral.name ?? "?",
              "uuids": (peripheral.services ?? []).map { $0.uuid.uuidString },
              "err": error?.localizedDescription ?? ""])
-        peripheral.services?.forEach { svc in
-            var chars: [CBUUID] = []
-            if svc.uuid == Trainer.service {
-                chars.append(Trainer.controlPoint)
-            }
-            chars.append(contentsOf: drivers.flatMap { $0.notifyCharacteristics(forService: svc.uuid) })
-            if svc.uuid == ZwiftRideController.service {
-                peripheral.discoverCharacteristics(nil, for: svc)   // discover all, incl. 0006
-            } else if !chars.isEmpty {
-                peripheral.discoverCharacteristics(unique(chars), for: svc)
-            }
+        if peripheral === hrPeripheral, peripheral !== powerPeripheral,
+           peripheral.services?.contains(where: { $0.uuid == PowerDriver.powerService }) == true {
+            // Bridge proven: it now owns power + trainer; drop the direct trainer link.
+            if let p = powerPeripheral { central.cancelPeripheralConnection(p) }
+            powerPeripheral = peripheral
         }
+        // All characteristics, not just the ones we decode: the proxy mirrors
+        // the full service so downstream clients get the real thing.
+        peripheral.services?.forEach { peripheral.discoverCharacteristics(nil, for: $0) }
+    }
+
+    /// GATT table changed under us — e.g. the bridging phone's app (re)started
+    /// after we connected and only now published its services. Rediscover;
+    /// re-subscribing / re-attaching is idempotent.
+    func peripheral(_ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]) {
+        log(["src": "ble", "ev": "servicesChanged", "name": peripheral.name ?? "?",
+             "invalidated": invalidatedServices.map { $0.uuid.uuidString }])
+        peripheral.discoverServices(discoveryServices)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService,
                     error: Error?) {
         service.characteristics?.forEach { ch in
             drivers.flatMap { $0.characteristicDiscovered(peripheral, ch) }.forEach(emit)
-            if ch.uuid == Trainer.controlPoint {
+            // Only the power-slot device drives the trainer: a phone bridging HR
+            // can expose an FTMS service too and would steal control.
+            if ch.uuid == Trainer.controlPoint, peripheral === powerPeripheral {
                 trainer.attach(peripheral, control: ch)
                 emit(.trainerReady)
+            }
+            if ch.uuid == Trainer.machineStatus, peripheral === powerPeripheral {
+                peripheral.setNotifyValue(true, for: ch)
             }
             if ZwiftRideController.isButtonChar(ch.uuid) {
                 if ch.properties.contains(.notify) || ch.properties.contains(.indicate) {
@@ -257,18 +299,20 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             // Adopt as the Ride controller. The KICKR CORE bridges the Zwift Ride
             // shifters through its own Zwift service, so the SAME peripheral can be
             // both the power/trainer device and the button source — don't clear
-            // the power/hr slots here.
-            ridePeripheral = peripheral
+            // the power/hr slots here — and don't let a bridge (KICKR, phone
+            // proxy) claim the Ride slot either: Forget/Connect on the real Ride
+            // would then miss it and cancel the bridge instead.
+            if peripheral !== powerPeripheral, peripheral !== hrPeripheral { ridePeripheral = peripheral }
             let chars = (service.characteristics ?? []).map {
                 "\($0.uuid.uuidString.suffix(4)):\($0.properties.rawValue)" }
             log(["src": "ble", "ev": "zwiftChars", "name": peripheral.name ?? "?",
                  "chars": chars])   // props rawValue: notify=0x10, write=0x08, wwr=0x04
         }
+        proxy.mirror(service, of: peripheral)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic,
                     error: Error?) {
-        guard characteristic.service?.uuid == ZwiftRideController.service else { return }
         log(["src": "ble", "ev": "notifyState",
              "char": characteristic.uuid.uuidString.suffix(4).description,
              "on": characteristic.isNotifying, "err": error?.localizedDescription ?? ""])
@@ -285,13 +329,18 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     /// (clamped) mode so the caller can keep its state in sync.
     @discardableResult
     func setTrainerMode(_ mode: TrainerMode) -> TrainerMode {
-        trainer.set(mode)
+        let m = trainer.set(mode)
+        // Downstream Orbeats won't hear this from the trainer either — we're
+        // the writer. Notify them ourselves on the mirrored status char.
+        proxy.push(Trainer.machineStatus, Data(FtmsMachineStatus.encode(m)))
+        return m
     }
 
     // MARK: Packet decode
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
+        proxy.upstreamUpdated(characteristic, characteristic.value, error: error)
         guard let data = characteristic.value else { return }
         let bytes = [UInt8](data)
         switch characteristic.uuid {
@@ -313,26 +362,35 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             if frame.newlyPressed.contains(where: { $0 & ZwiftButtonFrame.shiftDown != 0 }) {
                 inputs.append(.shiftDown)
             }
-            if !inputs.isEmpty { emit(.handlebar(inputs)) }
+            // An Orbeat bridge already acted on the press and mirrors the
+            // resulting mode via 2ADA — acting here too would double-step.
+            let viaBridge = discovered.contains { $0.peripheral === peripheral && $0.isBridge }
+            if !inputs.isEmpty, !viaBridge { emit(.handlebar(inputs)) }
             var rideEv: [String: Any] = ["src": "ride", "raw": frame.raw,
                                          "pressed": frame.pressed]
             if let n = deviceName(peripheral) { rideEv["device"] = n }
             log(rideEv)
         case HeartRateDriver.hrMeasurement:
-            // Only the HR-slot device; a rebroadcast bridge in the power slot
-            // could expose HR too and double-feed the model.
+            // Only the HR-slot device; a bridge in the power slot could expose
+            // HR too and double-feed the model.
             guard peripheral === hrPeripheral else { return }
-            rebroadcaster.relay(data, isPower: false)
             heartDriver.handle(peripheral, characteristic, bytes).forEach(emit)
         case PowerDriver.powerMeasurement:
             // Only the power-slot device; two sources interleaving here would
             // corrupt the parser's cumulative rev counters → speed/cadence spikes.
             guard peripheral === powerPeripheral else { return }
-            rebroadcaster.relay(data, isPower: true)
             powerDriver.handle(peripheral, characteristic, bytes).forEach(emit)
         case PowerDriver.ftmsIndoorBikeData:
             guard peripheral === powerPeripheral else { return }
             powerDriver.handle(peripheral, characteristic, bytes).forEach(emit)
+        case Trainer.machineStatus:
+            guard peripheral === powerPeripheral else { return }
+            log(["src": "ble", "ev": "ftmsStatus", "name": peripheral.name ?? "?",
+                 "raw": bytes.map { String(format: "%02x", $0) }.joined()])
+            if let m = FtmsMachineStatus.parse(bytes) {
+                trainer.observed(m)
+                emit(.trainerMode(m))
+            }
         default:
             break
         }
