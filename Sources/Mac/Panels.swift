@@ -82,6 +82,20 @@ extension AppDelegate {
         }
     }
 
+    /// History window (same view as the iOS Sessions tab, iCloud-synced).
+    @objc func showSessions() {
+        if sessionsWindow == nil {
+            let w = NSWindow(contentViewController: NSHostingController(
+                rootView: SessionsTab(core: core, store: core.store).frame(minWidth: 420, minHeight: 520)))
+            w.title = "Orbeat Sessions"
+            w.isReleasedWhenClosed = false
+            w.setFrameAutosaveName("OrbeatSessions")
+            sessionsWindow = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        sessionsWindow?.makeKeyAndOrderFront(nil)
+    }
+
     @objc func toggleFloating() {
         if let panel = floatingPanel {
             panel.close()
@@ -90,7 +104,7 @@ extension AppDelegate {
         }
         let host = NSHostingController(rootView:
             HeartCard(model: model, compact: false,
-                      onStep: { [weak self] in self?.applyRidePress([$0]) })
+                      onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer)
                 .background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)

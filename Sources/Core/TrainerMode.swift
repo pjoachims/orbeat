@@ -48,6 +48,13 @@ enum TrainerMode: Equatable {
 
 extension TrainerMode {
     /// Human-readable current target, for menus and HUDs.
+    func sameKind(as other: TrainerMode?) -> Bool {
+        switch (self, other) {
+        case (.erg, .erg?), (.resistance, .resistance?), (.sim, .sim?): return true
+        default: return false
+        }
+    }
+
     var label: String {
         switch self {
         case .erg(let w): return "ERG · \(w) W"

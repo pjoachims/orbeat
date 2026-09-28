@@ -1,36 +1,45 @@
 import SwiftUI
 import Charts
 
-/// Start/stop row on the main screen: elapsed clock while recording,
-/// history button otherwise.
+/// Start/stop row: elapsed clock while a session records here or on the
+/// peer (stop works for both), start button otherwise.
 struct SessionBar: View {
+    let core: AppCore
     @ObservedObject var store: SessionStore
+    @ObservedObject var model: RideModel   // peer's recordingSince
+    var compact = false
+    @State private var confirmStop = false
 
     var body: some View {
         HStack(spacing: 8) {
-            if let s = store.active {
+            if let since = core.recordingSince {
                 VStack(alignment: .leading, spacing: 3) {
-                    Eyebrow(text: "Session · \(s.samples.count) samples")
-                    Text(clock(store.elapsed))
-                        .font(.system(size: 22, weight: .semibold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
+                    Eyebrow(text: store.active.map { "Session · \($0.samples.count) samples" }
+                            ?? "Recording on \(PeerLink.peerLabel)")
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        Text(clock(ctx.date.timeIntervalSince(since)))
+                            .font(.system(size: compact ? 18 : 22, weight: .semibold))
+                            .monospacedDigit()
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .modifier(Tile(padding: 14))
-                Button { store.stop() } label: {
+                .modifier(Tile(padding: compact ? 10 : 14))
+                Button { confirmStop = true } label: {
                     Label("Stop", systemImage: "stop.fill")
                         .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 20)
+                        .padding(.horizontal, compact ? 14 : 18)
+                        .padding(.vertical, compact ? 15 : 20)
                         .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(orbeatRed.opacity(0.2)))
                         .foregroundStyle(orbeatRed)
                 }
                 .buttonStyle(.plain)
             } else {
-                action("Start session", "record.circle") { store.start() }
+                action("Start session", "record.circle") { core.startSession() }
             }
+        }
+        .confirmationDialog("Stop and save this session?", isPresented: $confirmStop) {
+            Button("Stop session", role: .destructive) { core.stopSession() }
         }
     }
 
@@ -39,9 +48,10 @@ struct SessionBar: View {
             Label(title, systemImage: symbol)
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
+                .padding(.vertical, compact ? 10 : 13)
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(.primary.opacity(0.08)))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -53,34 +63,25 @@ func clock(_ t: TimeInterval) -> String {
                      : String(format: "%d:%02d", s / 60, s % 60)
 }
 
-/// Sessions tab: the running session's KPIs and charts while recording,
-/// otherwise totals plus the history list.
+/// Sessions tab: the live session bar (here or on the peer), a link to the
+/// running session's charts, then totals and history.
 struct SessionsTab: View {
+    let core: AppCore
     @ObservedObject var store: SessionStore
-    // ponytail: charts redraw from a 5 s snapshot, not every 1 Hz sample —
-    // only the clock in the title ticks per second.
-    @State private var snapshot: Session?
-    private let refresh = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
+    @State private var path: [UUID] = []
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if store.active != nil, let s = snapshot ?? store.active {
-                    SessionDetail(session: s)
-                        .navigationTitle("Recording · \(clock(store.elapsed))")
-                        .toolbar {
-                            Button("Stop", systemImage: "stop.fill") { store.stop() }
-                                .tint(orbeatRed)
-                        }
-                } else {
-                    history
+        NavigationStack(path: $path) {
+            history
+                .navigationDestination(for: UUID.self) { id in
+                    if id == store.active?.id {
+                        LiveSessionDetail(store: store)
+                    } else if let s = store.past.first(where: { $0.id == id }) {
+                        SessionDetail(session: s)
+                    }
                 }
-            }
-            .navigationDestination(for: UUID.self) { id in
-                if let s = store.past.first(where: { $0.id == id }) { SessionDetail(session: s) }
-            }
-            .onReceive(refresh) { _ in snapshot = store.active }
-            .onChange(of: store.active == nil) { _, _ in snapshot = store.active }
+                // Stopped (here or from the other device): leave the live view.
+                .onChange(of: store.active?.id) { old, _ in path.removeAll { $0 == old } }
         }
     }
 
@@ -98,17 +99,14 @@ struct SessionsTab: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
-                Button { store.start() } label: {
-                    Label("Start session", systemImage: "record.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.primary.opacity(0.08)))
+                SessionBar(core: core, store: store, model: core.model)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                if let a = store.active {
+                    NavigationLink(value: a.id) {
+                        Label("Live charts", systemImage: "waveform.path.ecg")
+                    }
                 }
-                .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
             }
             Section("History") {
                 if store.past.isEmpty {
@@ -135,9 +133,25 @@ struct SessionsTab: View {
     }
 }
 
+/// The running session's charts. Observes the store itself (a pushed
+/// navigation destination doesn't reliably refresh from its parent), so
+/// clock and charts follow each 1 Hz sample.
+struct LiveSessionDetail: View {
+    @ObservedObject var store: SessionStore
+
+    var body: some View {
+        if let s = store.active {
+            SessionDetail(session: s)
+                .navigationTitle("Recording · \(clock(store.elapsed))")
+        }
+    }
+}
+
 /// Stats + heart-rate / power over time.
 struct SessionDetail: View {
     let session: Session
+    /// Moving-average window in seconds, 0 = raw.
+    @AppStorage("chartSmoothing") private var window = 30.0
 
     var body: some View {
         ScrollView {
@@ -152,10 +166,17 @@ struct SessionDetail: View {
                         MetricTile(label: "km", value: String(format: "%.1f", session.distanceKm))
                     }
                 }
+                Picker("Smoothing", selection: $window) {
+                    Text("Raw").tag(0.0)
+                    Text("10 s").tag(10.0)
+                    Text("30 s").tag(30.0)
+                    Text("1 min").tag(60.0)
+                }
+                .pickerStyle(.segmented)
                 if !session.bpms.isEmpty {
                     Eyebrow(text: "Heart rate")
-                    Chart(thin(session.samples.filter { $0.bpm != nil }), id: \.t) { s in
-                        LineMark(x: .value("min", s.t / 60), y: .value("bpm", s.bpm!))
+                    Chart(curve(\.bpm), id: \.t) { p in
+                        LineMark(x: .value("min", p.t / 60), y: .value("bpm", p.v))
                             .foregroundStyle(orbeatRed)
                     }
                     .chartYScale(domain: .automatic(includesZero: false))
@@ -164,8 +185,8 @@ struct SessionDetail: View {
                 }
                 if !session.wattsAll.isEmpty {
                     Eyebrow(text: "Power")
-                    Chart(thin(session.samples.filter { $0.watts != nil }), id: \.t) { s in
-                        LineMark(x: .value("min", s.t / 60), y: .value("W", s.watts!))
+                    Chart(curve(\.watts), id: \.t) { p in
+                        LineMark(x: .value("min", p.t / 60), y: .value("W", p.v))
                             .foregroundStyle(.yellow)
                     }
                     .frame(height: 160)
@@ -174,13 +195,15 @@ struct SessionDetail: View {
             .padding(22)
         }
         .navigationTitle(session.start.formatted(date: .abbreviated, time: .shortened))
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
-    /// Keep charts cheap: at most ~600 points, every n-th sample.
-    private func thin(_ xs: [Session.Sample]) -> [Session.Sample] {
-        let n = max(1, xs.count / 600)
-        return n == 1 ? xs : xs.enumerated().filter { $0.offset % n == 0 }.map(\.element)
+    /// Smoothed over the full-res samples, then thinned so charts stay cheap.
+    private func curve(_ metric: KeyPath<Session.Sample, Int?>) -> [Curve.Point] {
+        let pts = session.samples.compactMap { s in s[keyPath: metric].map { Curve.Point(t: s.t, v: Double($0)) } }
+        return Curve.thin(Curve.smooth(pts, window: window))
     }
 
     /// Time-in-zone bar, one segment per zone.

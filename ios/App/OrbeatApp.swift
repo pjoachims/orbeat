@@ -5,33 +5,26 @@ import UIKit
 
 @main
 struct OrbeatApp: App {
-    @StateObject private var model = RideModel()
-    @StateObject private var store = SessionStore()
+    @StateObject private var core = AppCore()
     var body: some Scene {
         WindowGroup {
             TabView {
-                ContentView(model: model, store: store)
+                ContentView(core: core, model: core.model, store: core.store, recorder: core.recorder)
                     .tabItem { Label("Live", systemImage: "heart.fill") }
-                SessionsTab(store: store)
+                SessionsTab(core: core, store: core.store)
                     .tabItem { Label("Sessions", systemImage: "chart.xyaxis.line") }
             }
             .preferredColorScheme(.dark)
-            // Root-level: a tab's own .task is cancelled when it's switched away.
-            .task {
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(1))
-                    store.tick(model)
-                }
-            }
         }
     }
 }
 
 struct ContentView: View {
+    let core: AppCore
     @ObservedObject var model: RideModel
-    @State private var ble: BLEManager?
-    @StateObject private var recorder = Recorder()
     @ObservedObject var store: SessionStore
+    @ObservedObject var recorder: Recorder
+    private var ble: BLEManager? { core.ble }
     @State private var activity: Activity<OrbeatAttributes>?
     @State private var showDevices = false
     /// Vibrate/notify every N seconds while over threshold; 0 = off.
@@ -57,6 +50,7 @@ struct ContentView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("ORBEAT").font(.system(size: 12, weight: .bold)).kerning(2.2)
                 Spacer()
+                PeerBadge(model: model)
                 LiveDot(live: model.isFresh)
             }
             Text(model.hasData ? model.sourceName : model.bleStatus)
@@ -103,11 +97,12 @@ struct ContentView: View {
                 MetricTile(label: "km/h", value: speedTxt, valueSize: 26, padding: 14)
             }
             if model.trainerControllable {
-                TrainerStepper(mode: model.trainerMode, padding: 14) { applyRidePress([$0]) }
+                TrainerStepper(mode: model.trainerMode, padding: 14,
+                               onStep: { applyRidePress([$0]) }, onSet: core.setTrainer)
                     .padding(.top, 8)
             }
 
-            SessionBar(store: store)
+            SessionBar(core: core, store: store, model: model)
                 .padding(.top, 8)
 
             Spacer(minLength: 16)
@@ -175,7 +170,6 @@ struct ContentView: View {
             UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
-        .task { await feed() }
         .task { await alertLoop() }
         // Event-driven Live Activity updates: fires on every reading, so it also
         // runs on background BLE wakeups where a sleep-loop would be suspended.
@@ -259,31 +253,7 @@ struct ContentView: View {
         }
     }
 
-    /// Real sensors on device; simulated ride on the simulator (no BLE there).
-    private func feed() async {
-        #if targetEnvironment(simulator)
-        model.setLive(true, source: "Simulated ride")
-        model.trainerControllable = true
-        model.trainerMode = .sim(grade: model.grade)
-        var bpm = 128.0, watts = 210.0
-        while !Task.isCancelled {
-            bpm = min(174, max(96, bpm + .random(in: -4...5)))
-            watts = min(340, max(140, watts + .random(in: -14...14)))
-            model.ingest(Int(bpm))
-            model.watts = Int(watts)
-            model.cadence = Int.random(in: 84...96)
-            model.speedKmh = watts / 6.4
-            try? await Task.sleep(for: .seconds(1.1))
-        }
-        #else
-        guard ble == nil else { return }
-        let manager = BLEManager(log: recorder)
-        manager.onEvent = { [model] in model.apply($0, ble: manager) }
-        ble = manager
-        #endif
-    }
-
-    private func applyRidePress(_ inputs: [HandlebarInput]) { model.press(inputs, ble: ble) }
+    private func applyRidePress(_ inputs: [HandlebarInput]) { inputs.forEach(core.step) }
 }
 
 /// Discovered-sensor list — the iOS stand-in for the macOS "Connect Equipment" menu.

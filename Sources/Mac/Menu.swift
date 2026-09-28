@@ -24,6 +24,9 @@ extension AppDelegate {
                                    action: #selector(toggleFloating), keyEquivalent: "f")
         floatItem.target = self
         menu.addItem(floatItem)
+        let sessionsItem = NSMenuItem(title: "Sessions…", action: #selector(showSessions), keyEquivalent: "s")
+        sessionsItem.target = self
+        menu.addItem(sessionsItem)
         menu.addEquipmentSubmenu(from: ble, target: self)
         if model.trainerControllable {
             let mode = model.trainerMode

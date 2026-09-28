@@ -4,5 +4,7 @@ TestRun.failures = 0
 ErgsTests.run()
 TrainerModeTests.run()
 ZwiftTests.run()
+PeerWireTests.run()
+CurveTests.run()
 print(TestRun.failures == 0 ? "\nALL PASS" : "\n\(TestRun.failures) FAILURES")
 exit(TestRun.failures == 0 ? 0 : 1)

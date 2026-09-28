@@ -13,19 +13,22 @@ struct OrbeatApp {
     }
 }
 
-/// Composition root: wires the BLE component's events onto the ride model and
-/// owns all app policy. Menu lives in Menu.swift, windows/panels in Panels.swift.
+/// Mac shell around the shared AppCore: menu-bar item, popover, panels.
+/// Menu lives in Menu.swift, windows/panels in Panels.swift.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let model = RideModel()
-    let recorder = Recorder()
+    private(set) var core: AppCore!
+    var model: RideModel { core.model }
+    var recorder: Recorder { core.recorder }
+    var ble: BLEManager? { core.ble }
     var statusItem: NSStatusItem!
     var popover: NSPopover!
     var floatingPanel: NSPanel?
     var warningPanel: NSPanel?
+    var sessionsWindow: NSWindow?
     private var bpmObserver: AnyObject?
-    var ble: BLEManager?
 
     func applicationDidFinishLaunching(_ note: Notification) {
+        core = AppCore()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.action = #selector(statusClicked(_:))
@@ -36,9 +39,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover = NSPopover()
         popover.behavior = .transient
-        let host = NSHostingController(
-            rootView: HeartCard(model: model, compact: true,
-                                onStep: { [weak self] in self?.applyRidePress([$0]) }).padding(2))
+        let host = NSHostingController(rootView: VStack(spacing: 0) {
+            HeartCard(model: model, compact: true,
+                      onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer)
+            SessionBar(core: core, store: core.store, model: model, compact: true)
+                .padding([.horizontal, .bottom], 16)
+        }
+        .frame(width: 272)
+        .padding(2))
         host.sizingOptions = .preferredContentSize   // popover tracks the card's size
         popover.contentViewController = host
 
@@ -50,13 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } as AnyObject
 
         if CommandLine.arguments.contains("--float") { toggleFloating() }
-
-        // Start scanning for a standard BLE heart-rate device (incl. a Fitbit
-        // in workout "broadcast heart rate" mode). Falls back to the simulator.
-        let manager = BLEManager(log: recorder)
-        manager.onEvent = { [weak self] in self?.model.apply($0, ble: self?.ble) }
-        ble = manager
+        if CommandLine.arguments.contains("--sessions") { showSessions() }
     }
 
-    func applyRidePress(_ inputs: [HandlebarInput]) { model.press(inputs, ble: ble) }
+    func applyRidePress(_ inputs: [HandlebarInput]) { inputs.forEach(core.step) }
 }

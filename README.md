@@ -24,12 +24,26 @@ Verified: compiles, and the button-bitmap decode passes unit tests. **Not yet
 tested on hardware** — if a KICKR ignores FTMS control it may need the Wahoo
 proprietary path (noted in `Sources/Bluetooth.swift`).
 
-## Build (macOS)
+## Build
+
+One XcodeGen project (`project.yml`) for Mac, iOS and the widget; `Orbeat.xcodeproj` is generated, not committed.
+Signing needs your Apple ID in Xcode → Settings → Accounts (iCloud entitlements need provisioning profiles).
 
 ```sh
-./build.sh
-open Orbeat.app
+./build.sh              # Mac → ./Orbeat.app
+ios/deploy.sh [name]    # build + install + launch on a paired iPhone
+./test.sh               # decoder/driver/wire tests
 ```
+
+## Sync between Mac and iPhone
+
+- **Live**: Mac hosts a custom GATT service (`PeerLink.swift`), iPhone connects as central (survives backgrounding).
+  Each side sends only readings from sensors it is connected to directly (`PeerWire`), so nothing echoes.
+  Sensors can be on either device; the other mirrors them. Trainer steps / mode changes / session stop are routed to whichever device owns the trainer or session.
+- **History**: SwiftData in `Application Support/Orbeat/sessions.store`, synced via CloudKit (`iCloud.com.vibecode.orbeat`).
+  An old `Documents/sessions.json` is imported once and renamed `.imported`.
+- **Settings**: alert threshold via iCloud key-value store.
+- "Share sensors via Bluetooth" still rebroadcasts to third-party apps (Zwift etc.).
 
 ## DuckDB logging
 
@@ -54,4 +68,4 @@ Re-running a query re-reads the file, so results always include the latest sampl
 
 ## iOS
 
-Project generated from `ios/project.yml` (XcodeGen); open `ios/Orbeat.xcodeproj`.
+Same live card, sessions, trainer control; plus Dynamic Island / Live Activity and background alerts.

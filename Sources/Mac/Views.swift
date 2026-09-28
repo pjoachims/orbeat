@@ -24,6 +24,7 @@ struct HeartCard: View {
     var compact: Bool = true
     /// Trainer − / + from the card; nil hides the stepper even when a trainer is attached.
     var onStep: ((HandlebarInput) -> Void)? = nil
+    var onSet: ((TrainerMode) -> Void)? = nil
 
     private var live: Bool { model.hasData && model.isFresh }
     private var zone: Color { live ? rideZoneColor(model.bpm) : .secondary }
@@ -37,6 +38,7 @@ struct HeartCard: View {
                     Text("Heart Rate").font(.system(size: 13, weight: .semibold))
                 }
                 Spacer()
+                PeerBadge(model: model)
                 LiveDot(live: model.isFresh)
             }
             .padding(.bottom, compact ? 8 : 12)
@@ -93,7 +95,7 @@ struct HeartCard: View {
                         }
                     }
                     if model.trainerControllable, let onStep {
-                        TrainerStepper(mode: model.trainerMode, padding: compact ? 10 : 12, onStep: onStep)
+                        TrainerStepper(mode: model.trainerMode, padding: compact ? 10 : 12, onStep: onStep, onSet: onSet)
                     }
                 }
                 .padding(.top, compact ? 10 : 12)

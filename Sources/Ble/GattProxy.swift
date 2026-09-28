@@ -9,6 +9,9 @@ import CoreBluetooth
 ///
 /// One source per service UUID (latest mirrored wins) — a second HR strap
 /// can't coexist with the first, same as the hub's one-slot-per-type policy.
+///
+/// Also hosts fixed local services (the Mac's end of the peer link) on the same
+/// peripheral manager: one manager per app keeps advertising predictable.
 final class GattProxy: NSObject, CBPeripheralManagerDelegate {
     private var manager: CBPeripheralManager?
     /// Mirrored service by UUID, and which upstream peripheral it came from.
@@ -28,27 +31,55 @@ final class GattProxy: NSObject, CBPeripheralManagerDelegate {
     /// A downstream client wrote through us (char UUID, bytes) — after forwarding.
     var onDownstreamWrite: ((CBUUID, Data) -> Void)?
 
+    /// Fixed services published whether or not sensor sharing is on.
+    private var hosted: [CBMutableService] = []
+    private var hostedChars: Set<CBUUID> = []
+    /// Hosted-service traffic: writes, (un)subscribes, transmit queue drained.
+    var onHostedWrite: ((CBATTRequest) -> Void)?
+    var onHostedSubscribers: ((Int) -> Void)?
+    var onReady: (() -> Void)?
+    private var hostedSubscribers: Set<UUID> = [] {
+        didSet { if hostedSubscribers != oldValue { onHostedSubscribers?(hostedSubscribers.count) } }
+    }
+
+    /// Sensor sharing: mirror upstream services to third-party clients.
     var enabled = UserDefaults.standard.bool(forKey: "rebroadcast") {
         didSet {
             UserDefaults.standard.set(enabled, forKey: "rebroadcast")
-            enabled ? start() : stop()
+            guard enabled != oldValue else { return }
+            if let live { enabled ? services.values.forEach(live.add) : services.values.forEach(live.remove) }
+            sync()
         }
     }
 
     override init() {
         super.init()
-        if enabled { start() }
+        sync()
     }
 
-    private func start() {
-        guard manager == nil else { return }
-        manager = CBPeripheralManager(delegate: self, queue: .main)
+    /// Publish a fixed service (call once, before or after power-on).
+    func host(_ service: CBMutableService) {
+        hosted.append(service)
+        (service.characteristics ?? []).forEach { hostedChars.insert($0.uuid) }
+        live?.add(service)
+        sync()
     }
 
-    private func stop() {
-        manager?.stopAdvertising()
-        manager?.removeAllServices()
-        manager = nil
+    /// Notify hosted-char subscribers. False = transmit queue full; retry on `onReady`.
+    func update(_ data: Data, for ch: CBMutableCharacteristic) -> Bool {
+        live?.updateValue(data, for: ch, onSubscribedCentrals: nil) ?? false
+    }
+
+    /// Run the manager while anything needs it; (re)advertise the current set.
+    private func sync() {
+        if enabled || !hosted.isEmpty {
+            if manager == nil { manager = CBPeripheralManager(delegate: self, queue: .main) }
+            advertise()
+        } else {
+            manager?.stopAdvertising()
+            manager?.removeAllServices()
+            manager = nil
+        }
     }
 
     private static let mirrorable: CBCharacteristicProperties =
@@ -75,17 +106,17 @@ final class GattProxy: NSObject, CBPeripheralManagerDelegate {
         svc.characteristics = chars
         // Swap just this service: removeAllServices() would drop every
         // downstream subscription on the other mirrored services.
-        if let old = services[service.uuid] { live?.remove(old) }
+        if let old = services[service.uuid] { sharing?.remove(old) }
         services[service.uuid] = svc
         sources[service.uuid] = peripheral
-        live?.add(svc)
+        sharing?.add(svc)
         advertise()
     }
 
     /// Upstream gone: withdraw everything it backed (downstream sees Service Changed).
     func unmirror(_ peripheral: CBPeripheral) {
         for (uuid, p) in sources where p === peripheral {
-            if let svc = services[uuid] { live?.remove(svc) }
+            if let svc = services[uuid] { sharing?.remove(svc) }
             services[uuid] = nil; sources[uuid] = nil
         }
         // Sweep by owner, not by service: a char UUID may since have been
@@ -100,19 +131,25 @@ final class GattProxy: NSObject, CBPeripheralManagerDelegate {
     private var live: CBPeripheralManager? {
         manager.flatMap { $0.state == .poweredOn ? $0 : nil }
     }
+    /// Live manager, only while mirrored services should be published.
+    private var sharing: CBPeripheralManager? { enabled ? live : nil }
 
-    /// Re-advertise the current set. 16-bit UUIDs only: one 128-bit UUID
-    /// alone eats 18 of the 31 bytes and pushes 180D/1818 into Apple's
-    /// overflow area, invisible to non-Apple clients. Connected clients still
-    /// discover the 128-bit services (the Mac hub asks for them by UUID).
+    /// Re-advertise the current set. Mirrored 16-bit UUIDs first, 128-bit
+    /// ones after: a 128-bit UUID eats 18 of the 31 bytes and pushes whatever
+    /// follows into Apple's overflow area, invisible to non-Apple clients.
+    /// The hosted peer UUID can live there — PeerClient scans for it by UUID,
+    /// which iOS matches in the overflow. Mirrored 128-bit services are never
+    /// advertised; connected clients still discover them.
     private func advertise() {
         guard let live else { return }
         live.stopAdvertising()
-        let short = services.keys.filter { $0.data.count == 2 }.sorted { $0.uuidString < $1.uuidString }
-        guard !short.isEmpty else { return }
+        let short = enabled
+            ? services.keys.filter { $0.data.count == 2 }.sorted { $0.uuidString < $1.uuidString } : []
+        let uuids = short + hosted.map(\.uuid)
+        guard !uuids.isEmpty else { return }
         live.startAdvertising([
             CBAdvertisementDataLocalNameKey: "Orbeat",
-            CBAdvertisementDataServiceUUIDsKey: short,
+            CBAdvertisementDataServiceUUIDsKey: uuids,
         ])
     }
 
@@ -152,14 +189,16 @@ final class GattProxy: NSObject, CBPeripheralManagerDelegate {
             guard let m = mirrors[uuid] else { backlog[uuid] = nil; continue }
             if peripheral.updateValue(data, for: m, onSubscribedCentrals: nil) { backlog[uuid] = nil }
         }
+        onReady?()
     }
 
     // MARK: CBPeripheralManagerDelegate (downstream → upstream)
 
     func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         onLog?(["src": "ble", "ev": "proxyState", "state": peripheral.state.rawValue])
-        guard peripheral.state == .poweredOn else { return }
-        services.values.forEach { peripheral.add($0) }   // mirrored before power-on
+        guard peripheral.state == .poweredOn else { hostedSubscribers = []; return }
+        hosted.forEach { peripheral.add($0) }
+        if enabled { services.values.forEach { peripheral.add($0) } }   // mirrored before power-on
         advertise()
     }
 
@@ -171,9 +210,15 @@ final class GattProxy: NSObject, CBPeripheralManagerDelegate {
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
                            didSubscribeTo characteristic: CBCharacteristic) {
         onLog?(["src": "ble", "ev": "proxySubscribe", "char": characteristic.uuid.uuidString])
+        if hostedChars.contains(characteristic.uuid) { hostedSubscribers.insert(central.identifier); return }
         guard let (p, ch) = upstream[characteristic.uuid] else { return }
         p.setNotifyValue(true, for: ch)
         // ponytail: never unsubscribes upstream on didUnsubscribeFrom — the hub wants the stream anyway
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
+                           didUnsubscribeFrom characteristic: CBCharacteristic) {
+        if hostedChars.contains(characteristic.uuid) { hostedSubscribers.remove(central.identifier) }
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
@@ -187,6 +232,11 @@ final class GattProxy: NSObject, CBPeripheralManagerDelegate {
     /// One batch = one ATT transaction: exactly one respond(), all-or-nothing.
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
         guard let first = requests.first else { return }
+        if hostedChars.contains(first.characteristic.uuid) {
+            requests.forEach { onHostedWrite?($0) }
+            peripheral.respond(to: first, withResult: .success)
+            return
+        }
         guard requests.allSatisfy({ upstream[$0.characteristic.uuid] != nil && $0.value != nil }) else {
             peripheral.respond(to: first, withResult: .writeNotPermitted); return
         }

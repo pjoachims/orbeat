@@ -26,9 +26,13 @@ final class RideModel: ObservableObject {
     @Published private(set) var isFresh = false
     @Published var sourceName: String = "Simulated"
     @Published var bleStatus: String = "Starting…"
-    /// Alert threshold in BPM; 0 = off. Persisted.
+    /// Alert threshold in BPM; 0 = off. Persisted, and shared via iCloud KVS
+    /// (AppCore adopts changes from the other device).
     @Published var threshold: Int = UserDefaults.standard.integer(forKey: "threshold") {
-        didSet { UserDefaults.standard.set(threshold, forKey: "threshold") }
+        didSet {
+            UserDefaults.standard.set(threshold, forKey: "threshold")
+            NSUbiquitousKeyValueStore.default.set(Int64(threshold), forKey: "threshold")
+        }
     }
     var overThreshold: Bool { threshold > 0 && hasData && isFresh && bpm >= threshold }
     /// Instantaneous power from a BLE cycling power meter (KICKR etc.); nil = none connected.
@@ -54,6 +58,24 @@ final class RideModel: ObservableObject {
     }
     /// True once a real BLE device feeds data — suspends the simulator.
     private(set) var isLive = false
+
+    // MARK: Peer link
+
+    /// The other Orbeat (iPhone ↔ Mac) is connected.
+    @Published var peerConnected = false
+    /// Latest state from the peer: its directly connected sensors, trainer, session.
+    @Published var peer: PeerState?
+    /// A trainer is attached to THIS device (vs. controlled through the peer).
+    @Published var localTrainer = false
+    /// Readings from sensors connected to THIS device — what the peer link
+    /// publishes. Local wins over peer while it is fresh.
+    var directBPM: Int?
+    var directBPMAt = Date.distantPast
+    var directHRSource = ""
+    var directPower: PowerReading?
+    var directPowerAt = Date.distantPast
+    var directPowerSource = ""
+    static let directWindow: TimeInterval = 5
 
     private var timer: AnyCancellable?
     private var freshTimer: AnyCancellable?

@@ -1,48 +1,13 @@
 #!/bin/bash
+# Build the Mac app into ./Orbeat.app (xcodebuild, automatic signing — the
+# stable Apple Development identity keeps Bluetooth/iCloud grants across builds).
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="Orbeat.app"
-EXEC="Orbeat"
-BUNDLE_ID="com.vibecode.orbeat"
-
-echo "▸ Compiling…"
-rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-
-swiftc -O \
-  -target arm64-apple-macosx13.0 \
-  -framework SwiftUI -framework AppKit -framework Combine -framework CoreBluetooth \
-  $(find Sources -name '*.swift') \
-  -o "$APP/Contents/MacOS/$EXEC"
-
-cp Resources/Orbeat.icns "$APP/Contents/Resources/"
-
-cat > "$APP/Contents/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleName</key><string>Orbeat</string>
-  <key>CFBundleDisplayName</key><string>Orbeat</string>
-  <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
-  <key>CFBundleExecutable</key><string>$EXEC</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
-  <key>LSUIElement</key><true/>
-  <key>CFBundleIconFile</key><string>Orbeat</string>
-  <key>NSBluetoothAlwaysUsageDescription</key><string>Orbeat reads live heart rate from a nearby Bluetooth heart-rate device.</string>
-  <key>NSHighResolutionCapable</key><true/>
-</dict>
-</plist>
-PLIST
-
-# A real identity keeps the TCC identity stable across rebuilds; ad-hoc
-# signatures made macOS re-prompt for Bluetooth on every build.
-SIGN_ID=$(security find-identity -v -p codesigning | grep -o '"Apple Development[^"]*"' | head -1 | tr -d '"')
-echo "▸ Signing as ${SIGN_ID:-ad-hoc}…"
-codesign --force --deep --sign "${SIGN_ID:--}" "$APP" 2>/dev/null || true
-
-echo "✓ Built $APP"
+xcodegen -q
+echo "▸ Building Orbeat (macOS)…"
+xcodebuild -project Orbeat.xcodeproj -scheme OrbeatMac -configuration Release \
+  -destination 'platform=macOS' -derivedDataPath build -allowProvisioningUpdates build -quiet
+rm -rf Orbeat.app
+cp -R build/Build/Products/Release/Orbeat.app .
+echo "✓ Built Orbeat.app"

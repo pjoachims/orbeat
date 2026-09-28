@@ -184,24 +184,41 @@ struct MetricTile: View {
     }
 }
 
-/// Current trainer target with − / + steppers (same policy as the paddles).
+/// Current trainer target with − / + steppers (same policy as the paddles)
+/// and a Sim / ERG / Resistance switch.
 struct TrainerStepper: View {
     let mode: TrainerMode?
     var padding: CGFloat = 12
     let onStep: (HandlebarInput) -> Void
+    var onSet: ((TrainerMode) -> Void)? = nil
+
+    /// Switching kind starts from a gentle target, never a hard wall.
+    private static let kinds: [(String, TrainerMode)] =
+        [("Sim", .sim(grade: 0)), ("ERG", .erg(targetWatts: 120)), ("Res", .resistance(percent: 20))]
 
     var body: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
-                Eyebrow(text: "Trainer · ±\(mode?.stepLabel.dropFirst() ?? "")")
-                Text(mode?.label ?? "Ready")
-                    .font(.system(size: 15, weight: .semibold))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Eyebrow(text: "Trainer · ±\(mode?.stepLabel.dropFirst() ?? "")")
+                    Text(mode?.label ?? "Ready")
+                        .font(.system(size: 15, weight: .semibold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                }
+                Spacer(minLength: 4)
+                stepButton("minus") { onStep(.shiftDown) }
+                stepButton("plus") { onStep(.shiftUp) }
             }
-            Spacer(minLength: 4)
-            stepButton("minus") { onStep(.shiftDown) }
-            stepButton("plus") { onStep(.shiftUp) }
+            if let onSet {
+                Picker("Mode", selection: Binding(
+                    get: { Self.kinds.firstIndex { $0.1.sameKind(as: mode) } ?? -1 },
+                    set: { onSet(Self.kinds[$0].1) })) {
+                    ForEach(Self.kinds.indices, id: \.self) { Text(Self.kinds[$0].0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
         }
         .modifier(Tile(padding: padding))
     }
@@ -216,6 +233,22 @@ struct TrainerStepper: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// "Linked to iPhone/Mac" capsule; hidden while the peer link is down.
+struct PeerBadge: View {
+    @ObservedObject var model: RideModel
+    var body: some View {
+        if model.peerConnected {
+            Label(PeerLink.peerLabel, systemImage: "link")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(.primary.opacity(0.08)))
+                .help("Linked to Orbeat on your \(PeerLink.peerLabel)")
+        }
     }
 }
 
