@@ -20,7 +20,9 @@ struct Session: Codable, Identifiable {
     var end: Date?
     var samples: [Sample] = []
 
-    var duration: TimeInterval { (end ?? Date()).timeIntervalSince(start) }
+    /// Recorded (moving) time: pauses and resumes don't count.
+    /// ponytail: a sensor lost before stop trims the tail; store the clock if that matters.
+    var duration: TimeInterval { samples.last?.t ?? 0 }
     var bpms: [Int] { samples.compactMap(\.bpm) }
     var wattsAll: [Int] { samples.compactMap(\.watts) }
     var avgBPM: Int? { bpms.isEmpty ? nil : bpms.reduce(0, +) / bpms.count }
@@ -67,6 +69,8 @@ final class SessionStore: ObservableObject {
     @Published private(set) var past: [Session] = []
     /// Elapsed seconds of the active session; ticks so the UI can show a clock.
     @Published private(set) var elapsed: TimeInterval = 0
+    /// The active session's clock (nil = not recording here).
+    @Published private(set) var clock: SessionClock?
 
     private let context: ModelContext
     private var remote: AnyCancellable?
@@ -104,15 +108,40 @@ final class SessionStore: ObservableObject {
             .sink { [weak self] _ in self?.reload() }
     }
 
-    func start() { active = Session(start: Date()); elapsed = 0 }
+    func start() { active = Session(start: Date()); elapsed = 0; clock = .running(since: Date()) }
+
+    /// Reopen a saved session: new samples continue its clock.
+    func resume(_ s: Session) {
+        var s = s
+        s.end = nil
+        active = s
+        elapsed = s.duration
+        clock = SessionClock.paused(elapsed: s.duration).resuming()
+    }
+
+    func setPaused(_ paused: Bool) {
+        guard let c = clock, c.isPaused != paused else { return }
+        clock = paused ? c.pausing() : c.resuming()
+        elapsed = clock!.elapsed()
+    }
 
     func stop() {
         guard var s = active else { return }
         s.end = Date()
         active = nil
-        // Ignore accidental taps: nothing sampled and under 10 s.
-        if s.samples.isEmpty && s.duration < 10 { return }
-        context.insert(SessionRecord(s))
+        clock = nil
+        // Nothing sampled (accidental tap, no sensors): nothing to keep.
+        if s.samples.isEmpty { return }
+        // A resumed session updates its record in place.
+        // ponytail: continued on both devices while unlinked, last save wins.
+        let id = s.id
+        let match = FetchDescriptor<SessionRecord>(predicate: #Predicate { $0.id == id })
+        if let r = try? context.fetch(match).first {
+            r.end = s.end
+            r.samples = SessionRecord(s).samples
+        } else {
+            context.insert(SessionRecord(s))
+        }
         save()
     }
 
@@ -128,8 +157,8 @@ final class SessionStore: ObservableObject {
     /// Call on every reading and once a second; samples at most 1 Hz. Records
     /// only fresh readings, so a dropped strap leaves a gap, not a flat line.
     func tick(_ m: RideModel) {
-        guard active != nil else { return }
-        elapsed = active!.duration
+        guard active != nil, case .running? = clock else { return }
+        elapsed = clock!.elapsed()
         if let last = active!.samples.last, elapsed - last.t < 0.95 { return }
         let live = m.hasData && m.isFresh
         let s = Session.Sample(t: elapsed, bpm: live ? m.bpm : nil,

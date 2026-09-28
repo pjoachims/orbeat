@@ -12,13 +12,44 @@ struct PeerState: Codable, Equatable {
     var powerSource: String?
     /// Trainer target, set only while this device controls a trainer.
     var trainer: TrainerMode?
-    /// Start of the session this device is recording, if any.
+    /// Session this device is recording, if any: its clock's virtual start
+    /// while running, or the frozen elapsed seconds while paused.
     var recordingSince: Date?
+    var recordingPaused: TimeInterval?
 
     enum CodingKeys: String, CodingKey {
         case bpm = "b", hrSource = "hs", watts = "w", cadence = "c", kmh = "k",
-             powerSource = "ps", trainer = "t", recordingSince = "r"
+             powerSource = "ps", trainer = "t", recordingSince = "r", recordingPaused = "rp"
     }
+
+    var recording: SessionClock? {
+        get { recordingPaused.map(SessionClock.paused) ?? recordingSince.map(SessionClock.running) }
+        set {
+            switch newValue {
+            case .running(let since)?: recordingSince = since; recordingPaused = nil
+            case .paused(let e)?: recordingSince = nil; recordingPaused = e
+            case nil: recordingSince = nil; recordingPaused = nil
+            }
+        }
+    }
+}
+
+/// A recording session's clock. Running counts from a virtual start (real
+/// start shifted by paused time); paused holds the elapsed seconds.
+enum SessionClock: Equatable {
+    case running(since: Date)
+    case paused(elapsed: TimeInterval)
+
+    func elapsed(at now: Date = Date()) -> TimeInterval {
+        switch self {
+        case .running(let since): return now.timeIntervalSince(since)
+        case .paused(let e): return e
+        }
+    }
+
+    var isPaused: Bool { if case .paused = self { return true } else { return false } }
+    func pausing(at now: Date = Date()) -> SessionClock { .paused(elapsed: elapsed(at: now)) }
+    func resuming(at now: Date = Date()) -> SessionClock { .running(since: now.addingTimeInterval(-elapsed(at: now))) }
 }
 
 /// Remote control: sent to the device that owns the trainer / the session.
@@ -27,6 +58,8 @@ enum PeerCommand: Equatable {
     case setTrainer(TrainerMode)
     /// Stop the session the receiver is recording (sessions record where started).
     case stopSession
+    /// Pause (true) or resume (false) the receiver's session.
+    case pauseSession(Bool)
 }
 
 enum PeerMessage: Equatable {
@@ -42,6 +75,7 @@ enum PeerWire {
         var step: Int?          // +1 up, -1 down
         var set: TrainerMode?
         var stop: Bool?
+        var pause: Bool?
     }
 
     static func encode(_ m: PeerMessage) -> Data {
@@ -51,6 +85,7 @@ enum PeerWire {
         case .command(.step(let i)): e.step = i == .shiftUp ? 1 : -1
         case .command(.setTrainer(let t)): e.set = t
         case .command(.stopSession): e.stop = true
+        case .command(.pauseSession(let p)): e.pause = p
         }
         return (try? encoder.encode(e)) ?? Data()
     }
@@ -61,6 +96,7 @@ enum PeerWire {
         if let s = e.step { return .command(.step(s > 0 ? .shiftUp : .shiftDown)) }
         if let t = e.set { return .command(.setTrainer(t)) }
         if e.stop == true { return .command(.stopSession) }
+        if let p = e.pause { return .command(.pauseSession(p)) }
         return nil
     }
 

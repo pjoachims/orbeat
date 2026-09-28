@@ -192,7 +192,7 @@ struct TrainerStepper: View {
     let onStep: (HandlebarInput) -> Void
     var onSet: ((TrainerMode) -> Void)? = nil
 
-    /// Switching kind starts from a gentle target, never a hard wall.
+    /// Kind markers only: the trainer owner resumes each kind's last target.
     private static let kinds: [(String, TrainerMode)] =
         [("Sim", .sim(grade: 0)), ("ERG", .erg(targetWatts: 120))]
 

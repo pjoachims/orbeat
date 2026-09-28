@@ -6,24 +6,35 @@ import Charts
 struct SessionBar: View {
     let core: AppCore
     @ObservedObject var store: SessionStore
-    @ObservedObject var model: RideModel   // peer's recordingSince
+    @ObservedObject var model: RideModel   // peer's recording clock
     var compact = false
     @State private var confirmStop = false
 
     var body: some View {
         HStack(spacing: 8) {
-            if let since = core.recordingSince {
+            if let rec = core.recording {
                 VStack(alignment: .leading, spacing: 3) {
-                    Eyebrow(text: store.active.map { "Session · \($0.samples.count) samples" }
+                    Eyebrow(text: rec.isPaused ? "Paused"
+                            : store.active.map { "Session · \($0.samples.count) samples" }
                             ?? "Recording on \(PeerLink.peerLabel)")
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                        Text(clock(ctx.date.timeIntervalSince(since)))
+                        Text(clock(rec.elapsed(at: ctx.date)))
                             .font(.system(size: compact ? 18 : 22, weight: .semibold))
                             .monospacedDigit()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modifier(Tile(padding: compact ? 10 : 14))
+                Button { core.setPaused(!rec.isPaused) } label: {
+                    Image(systemName: rec.isPaused ? "play.fill" : "pause.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, compact ? 14 : 18)
+                        .padding(.vertical, compact ? 15 : 20)
+                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.primary.opacity(0.08)))
+                }
+                .buttonStyle(.plain)
+                .help(rec.isPaused ? "Resume" : "Pause")
                 Button { confirmStop = true } label: {
                     Label("Stop", systemImage: "stop.fill")
                         .font(.subheadline.weight(.semibold))
@@ -73,13 +84,7 @@ struct SessionsTab: View {
     var body: some View {
         NavigationStack(path: $path) {
             history
-                .navigationDestination(for: UUID.self) { id in
-                    if id == store.active?.id {
-                        LiveSessionDetail(store: store)
-                    } else if let s = store.past.first(where: { $0.id == id }) {
-                        SessionDetail(session: s)
-                    }
-                }
+                .navigationDestination(for: UUID.self) { SessionPage(core: core, store: store, model: core.model, id: $0) }
                 // Stopped (here or from the other device): leave the live view.
                 .onChange(of: store.active?.id) { old, _ in path.removeAll { $0 == old } }
         }
@@ -89,6 +94,8 @@ struct SessionsTab: View {
         let week = store.past.filter { $0.start > Date().addingTimeInterval(-7 * 86400) }
         let weekTime = week.reduce(0) { $0 + $1.duration }
         let weekBPM = week.compactMap(\.avgBPM)
+        // A continued session shows as the live one, not also as history.
+        let saved = store.past.filter { $0.id != store.active?.id }
         return List {
             Section {
                 LazyVGrid(columns: [.init(.flexible()), .init(.flexible()), .init(.flexible())], spacing: 8) {
@@ -109,10 +116,10 @@ struct SessionsTab: View {
                 }
             }
             Section("History") {
-                if store.past.isEmpty {
+                if saved.isEmpty {
                     Text("No sessions yet.").foregroundStyle(.secondary)
                 }
-                ForEach(store.past) { s in
+                ForEach(saved) { s in
                     NavigationLink(value: s.id) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(s.start, format: .dateTime.weekday(.wide).day().month().hour().minute())
@@ -126,23 +133,36 @@ struct SessionsTab: View {
                         }
                     }
                 }
-                .onDelete { idx in idx.map { store.past[$0] }.forEach(store.delete) }
+                .onDelete { idx in idx.map { saved[$0] }.forEach(store.delete) }
             }
         }
         .navigationTitle("Sessions")
     }
 }
 
-/// The running session's charts. Observes the store itself (a pushed
-/// navigation destination doesn't reliably refresh from its parent), so
-/// clock and charts follow each 1 Hz sample.
-struct LiveSessionDetail: View {
+/// One session's page: live charts while it records, else the saved one
+/// with Continue. Observes store and model itself (a pushed navigation
+/// destination doesn't reliably refresh from its parent), so clock and
+/// charts follow each 1 Hz sample and Continue follows the peer's session.
+struct SessionPage: View {
+    let core: AppCore
     @ObservedObject var store: SessionStore
+    @ObservedObject var model: RideModel
+    let id: UUID
 
     var body: some View {
-        if let s = store.active {
+        if let s = store.active, s.id == id {
             SessionDetail(session: s)
                 .navigationTitle("Recording · \(clock(store.elapsed))")
+        } else if let s = store.past.first(where: { $0.id == id }) {
+            SessionDetail(session: s)
+                .toolbar {
+                    if core.recording == nil {
+                        Button { core.continueSession(s) } label: {
+                            Label("Continue", systemImage: "record.circle")
+                        }
+                    }
+                }
         }
     }
 }

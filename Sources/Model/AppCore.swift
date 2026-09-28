@@ -55,19 +55,31 @@ final class AppCore: ObservableObject {
         else if model.peer?.trainer != nil { peer?.send(.command(.setTrainer(mode))) }
     }
 
-    /// Session running here or on the peer.
-    var recordingSince: Date? { store.active?.start ?? model.peer?.recordingSince }
+    /// Clock of the session running here or on the peer.
+    var recording: SessionClock? { store.clock ?? model.peer?.recording }
 
     /// Records on this device (sessions record where they are started).
     func startSession() {
-        guard recordingSince == nil else { return }
+        guard recording == nil else { return }
         store.start()
         pushState(force: true)
     }
 
+    /// Reopen a saved session here; it records on as the same session.
+    func continueSession(_ s: Session) {
+        guard recording == nil else { return }
+        store.resume(s)
+        pushState(force: true)
+    }
+
+    func setPaused(_ paused: Bool) {
+        if store.active != nil { store.setPaused(paused); pushState(force: true) }
+        else if model.peer?.recording != nil { peer?.send(.command(.pauseSession(paused))) }
+    }
+
     func stopSession() {
         if store.active != nil { store.stop(); pushState(force: true) }
-        else if model.peer?.recordingSince != nil { peer?.send(.command(.stopSession)) }
+        else if model.peer?.recording != nil { peer?.send(.command(.stopSession)) }
     }
 
     // MARK: Plumbing
@@ -104,6 +116,8 @@ final class AppCore: ObservableObject {
             if model.localTrainer { setTrainer(m) }
         case .command(.stopSession):
             if store.active != nil { stopSession() }
+        case .command(.pauseSession(let p)):
+            if store.active != nil { setPaused(p) }
         }
     }
 
@@ -115,7 +129,7 @@ final class AppCore: ObservableObject {
     private func pushState(force: Bool = false) {
         guard let peer, peer.connected, force || Date().timeIntervalSince(lastPush) >= 0.9 else { return }
         lastPush = Date()
-        peer.send(.state(model.directState(recordingSince: store.active?.start)))
+        peer.send(.state(model.directState(recording: store.clock)))
     }
 
     #if targetEnvironment(simulator)

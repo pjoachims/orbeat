@@ -41,9 +41,18 @@ extension RideModel {
         case .trainerReady:
             localTrainer = true
             trainerControllable = true
-            // Start in sim mode at the persisted grade (never resists hard on
-            // connect until a paddle or the UI raises it).
-            trainerMode = ble?.setTrainerMode(.sim(grade: grade))
+            // The peer may already ride this trainer: keep its target. Else
+            // start in sim at the persisted grade (never resists hard on
+            // connect) — after a grace period, so a peer link still coming
+            // up can report its target first (adopted in apply(peer:)).
+            trainerAttach += 1
+            let attach = trainerAttach
+            trainerMode = peer?.trainer
+            guard trainerMode == nil else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak ble] in
+                guard let self, attach == trainerAttach, localTrainer, trainerMode == nil else { return }
+                trainerMode = ble?.setTrainerMode(.sim(grade: grade))
+            }
         case .trainerLost:
             localTrainer = false
             trainerControllable = peer?.trainer != nil
@@ -52,7 +61,7 @@ extension RideModel {
             // Trainer is the source of truth: follows changes made by any
             // other client on the same trainer.
             trainerMode = m
-            if case .sim(let g) = m { grade = g }
+            remember(m)
         }
     }
 
@@ -75,20 +84,24 @@ extension RideModel {
         if !localTrainer, trainerMode != s?.trainer {
             trainerControllable = s?.trainer != nil
             trainerMode = s?.trainer
-            if case .sim(let g) = s?.trainer { grade = g }
+            remember(s?.trainer)
+        } else if localTrainer, trainerMode == nil, let t = s?.trainer {
+            trainerMode = t   // both on one trainer: adopt the peer's target, no write
+            remember(t)
         }
     }
 
     /// What this device publishes to its peer: direct readings only.
-    func directState(recordingSince: Date?) -> PeerState {
+    func directState(recording: SessionClock?) -> PeerState {
         let now = Date()
         let hr = now.timeIntervalSince(directBPMAt) < Self.directWindow
         let pw = now.timeIntervalSince(directPowerAt) < Self.directWindow ? directPower : nil
-        return PeerState(bpm: hr ? directBPM : nil, hrSource: hr ? directHRSource : nil,
-                         watts: pw?.watts, cadence: pw?.cadence, kmh: pw?.kmh,
-                         powerSource: pw != nil ? directPowerSource : nil,
-                         trainer: localTrainer ? trainerMode : nil,
-                         recordingSince: recordingSince)
+        var s = PeerState(bpm: hr ? directBPM : nil, hrSource: hr ? directHRSource : nil,
+                          watts: pw?.watts, cadence: pw?.cadence, kmh: pw?.kmh,
+                          powerSource: pw != nil ? directPowerSource : nil,
+                          trainer: localTrainer ? trainerMode : nil)
+        s.recording = recording
+        return s
     }
 
     /// Step the LOCAL trainer's current mode: ERG ±5 W, resistance ±10 %, sim ±0.5 %.
@@ -100,10 +113,21 @@ extension RideModel {
         setTrainer(mode, ble: ble)
     }
 
-    /// Push a target to the LOCAL trainer.
+    /// Push a target to the LOCAL trainer. A different kind (the picker)
+    /// resumes that kind's last target.
     func setTrainer(_ mode: TrainerMode, ble: BLEManager?) {
-        trainerMode = ble?.setTrainerMode(mode) ?? mode.clamped
-        if case .sim(let g) = trainerMode { grade = g }   // persist sim grade
+        let m = mode.sameKind(as: trainerMode) ? mode : mode.resumed(ergWatts: ergWatts, grade: grade)
+        trainerMode = ble?.setTrainerMode(m) ?? m.clamped
+        remember(trainerMode)
+    }
+
+    /// Persist the latest target per kind, from wherever it was set.
+    private func remember(_ m: TrainerMode?) {
+        switch m {
+        case .erg(let w)?: ergWatts = w
+        case .sim(let g)?: grade = g
+        default: break
+        }
     }
 
     private func showPower(_ w: Int, _ c: Int?) {
