@@ -31,7 +31,7 @@ final class RideModel: ObservableObject {
     @Published var threshold: Int = UserDefaults.standard.integer(forKey: "threshold") {
         didSet {
             UserDefaults.standard.set(threshold, forKey: "threshold")
-            NSUbiquitousKeyValueStore.default.set(Int64(threshold), forKey: "threshold")
+            if SessionStore.cloudSync { NSUbiquitousKeyValueStore.default.set(Int64(threshold), forKey: "threshold") }
         }
     }
     var overThreshold: Bool { threshold > 0 && hasData && isFresh && bpm >= threshold }

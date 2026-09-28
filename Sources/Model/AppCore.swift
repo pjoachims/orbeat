@@ -74,6 +74,7 @@ final class AppCore: ObservableObject {
 
     /// Threshold via iCloud KVS: cloud value wins at launch, then follow changes.
     private func syncSettings() {
+        guard SessionStore.cloudSync else { return }
         let kvs = NSUbiquitousKeyValueStore.default
         let adopt = { [model] in
             if kvs.object(forKey: "threshold") != nil { model.threshold = Int(kvs.longLong(forKey: "threshold")) }
