@@ -30,17 +30,17 @@ enum TrainerMode: Equatable {
 
     var steppedUp: TrainerMode {
         switch self {
-        case .erg(let w): return TrainerMode.erg(targetWatts: w + 10).clamped
+        case .erg(let w): return TrainerMode.erg(targetWatts: w + 5).clamped
         case .resistance(let p): return TrainerMode.resistance(percent: p + 10).clamped
-        case .sim(let g): return TrainerMode.sim(grade: g + 100).clamped
+        case .sim(let g): return TrainerMode.sim(grade: g + 50).clamped
         }
     }
 
     var steppedDown: TrainerMode {
         switch self {
-        case .erg(let w): return TrainerMode.erg(targetWatts: w - 10).clamped
+        case .erg(let w): return TrainerMode.erg(targetWatts: w - 5).clamped
         case .resistance(let p): return TrainerMode.resistance(percent: p - 10).clamped
-        case .sim(let g): return TrainerMode.sim(grade: g - 100).clamped
+        case .sim(let g): return TrainerMode.sim(grade: g - 50).clamped
         }
     }
 
@@ -63,12 +63,12 @@ extension TrainerMode {
         }
     }
 
-    /// Label for one step in this mode, e.g. "+10 W".
+    /// Label for one step in this mode, e.g. "+5 W".
     var stepLabel: String {
         switch self {
-        case .erg: return "+10 W"
+        case .erg: return "+5 W"
         case .resistance: return "+10 %"
-        case .sim: return "+1 %"
+        case .sim: return "+0.5 %"
         }
     }
 }

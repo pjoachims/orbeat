@@ -185,7 +185,7 @@ struct MetricTile: View {
 }
 
 /// Current trainer target with − / + steppers (same policy as the paddles)
-/// and a Sim / ERG / Resistance switch.
+/// and a Sim / ERG switch.
 struct TrainerStepper: View {
     let mode: TrainerMode?
     var padding: CGFloat = 12
@@ -194,7 +194,7 @@ struct TrainerStepper: View {
 
     /// Switching kind starts from a gentle target, never a hard wall.
     private static let kinds: [(String, TrainerMode)] =
-        [("Sim", .sim(grade: 0)), ("ERG", .erg(targetWatts: 120)), ("Res", .resistance(percent: 20))]
+        [("Sim", .sim(grade: 0)), ("ERG", .erg(targetWatts: 120))]
 
     var body: some View {
         VStack(spacing: 10) {

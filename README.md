@@ -11,8 +11,8 @@ macOS menu-bar heart-rate monitor with an iOS companion (widget + Live Activity)
 
 No Zwift needed — Orbeat is the controller. It connects to a KICKR (or any
 FTMS trainer) and to a Zwift Ride / Zwift Play handlebar controller, and the
-shifter paddles set the trainer's ERG target power: **shift up = +10 W,
-shift down = −10 W** (clamped 30–600 W, persisted). Fallback while testing:
+shifter paddles set the trainer's ERG target power: **shift up = +5 W,
+shift down = −5 W** (clamped 30–600 W, persisted). Fallback while testing:
 right-click the menu-bar icon → **Harder / Easier** once the trainer connects.
 
 Both pair through **Connect Equipment** in the right-click menu; the Ride
