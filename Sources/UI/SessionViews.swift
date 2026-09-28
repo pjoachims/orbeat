@@ -174,7 +174,9 @@ struct SessionDetail: View {
             .padding(22)
         }
         .navigationTitle(session.start.formatted(date: .abbreviated, time: .shortened))
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
     /// Keep charts cheap: at most ~600 points, every n-th sample.
