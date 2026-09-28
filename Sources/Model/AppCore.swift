@@ -11,6 +11,7 @@ final class AppCore: ObservableObject {
     private(set) var ble: BLEManager?
     private(set) var peer: PeerLink?
     private var timer: AnyCancellable?
+    private var settings: AnyCancellable?
     private var lastPush = Date.distantPast
 
     init() {
@@ -35,6 +36,7 @@ final class AppCore: ObservableObject {
         }
         self.peer = peer
         #endif
+        syncSettings()
         // Mac: the heartbeat. iOS: suspended in background, where sensor
         // events (which wake the app) drive sampling and pushes instead.
         timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -69,6 +71,20 @@ final class AppCore: ObservableObject {
     }
 
     // MARK: Plumbing
+
+    /// Threshold via iCloud KVS: cloud value wins at launch, then follow changes.
+    private func syncSettings() {
+        let kvs = NSUbiquitousKeyValueStore.default
+        let adopt = { [model] in
+            if kvs.object(forKey: "threshold") != nil { model.threshold = Int(kvs.longLong(forKey: "threshold")) }
+        }
+        settings = NotificationCenter.default
+            .publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: kvs)
+            .receive(on: DispatchQueue.main)
+            .sink { _ in adopt() }
+        kvs.synchronize()
+        adopt()
+    }
 
     private func handle(_ event: SensorEvent) {
         if case .handlebar(let inputs) = event { inputs.forEach(step) }
