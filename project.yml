@@ -54,7 +54,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.vibecode.orbeat
         # Not sandboxed: the JSONL log lives in ~/Library/Application Support/Orbeat
         # where an external rsync job reads it.
-        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_HARDENED_RUNTIME: YES
 
   Orbeat:
     type: application
