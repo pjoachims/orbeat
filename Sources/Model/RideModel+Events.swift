@@ -90,15 +90,16 @@ extension RideModel {
     }
 
     /// What this device publishes to its peer: direct readings only.
-    func directState(recordingSince: Date?) -> PeerState {
+    func directState(recording: SessionClock?) -> PeerState {
         let now = Date()
         let hr = now.timeIntervalSince(directBPMAt) < Self.directWindow
         let pw = now.timeIntervalSince(directPowerAt) < Self.directWindow ? directPower : nil
-        return PeerState(bpm: hr ? directBPM : nil, hrSource: hr ? directHRSource : nil,
-                         watts: pw?.watts, cadence: pw?.cadence, kmh: pw?.kmh,
-                         powerSource: pw != nil ? directPowerSource : nil,
-                         trainer: localTrainer ? trainerMode : nil,
-                         recordingSince: recordingSince)
+        var s = PeerState(bpm: hr ? directBPM : nil, hrSource: hr ? directHRSource : nil,
+                          watts: pw?.watts, cadence: pw?.cadence, kmh: pw?.kmh,
+                          powerSource: pw != nil ? directPowerSource : nil,
+                          trainer: localTrainer ? trainerMode : nil)
+        s.recording = recording
+        return s
     }
 
     /// Step the LOCAL trainer's current mode: ERG ±5 W, resistance ±10 %, sim ±0.5 %.

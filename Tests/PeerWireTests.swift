@@ -14,6 +14,9 @@ enum PeerWireTests {
             .command(.setTrainer(.erg(targetWatts: 250))),
             .command(.setTrainer(.sim(grade: -500))),
             .command(.stopSession),
+            .command(.pauseSession(true)),
+            .command(.pauseSession(false)),
+            .state(PeerState(recordingPaused: 3725.5)),
         ]
         for m in messages {
             let data = PeerWire.encode(m)
@@ -24,5 +27,15 @@ enum PeerWireTests {
         check("peer state fits one ATT payload (\(size) B)", size <= 180)
         check("peer garbage ignored", PeerWire.decode(Data("nope".utf8)) == nil)
         check("peer empty envelope ignored", PeerWire.decode(Data("{}".utf8)) == nil)
+
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        let run = SessionClock.running(since: t0)
+        let paused = run.pausing(at: t0.addingTimeInterval(60))
+        check("clock pause freezes", paused == .paused(elapsed: 60) && paused.elapsed(at: t0.addingTimeInterval(500)) == 60)
+        check("clock resume continues", paused.resuming(at: t0.addingTimeInterval(500)).elapsed(at: t0.addingTimeInterval(510)) == 70)
+        var st = PeerState(); st.recording = paused
+        check("peer clock paused", st.recording == paused && st.recordingSince == nil)
+        st.recording = run
+        check("peer clock running", st.recording == run && st.recordingPaused == nil)
     }
 }

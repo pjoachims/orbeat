@@ -6,24 +6,35 @@ import Charts
 struct SessionBar: View {
     let core: AppCore
     @ObservedObject var store: SessionStore
-    @ObservedObject var model: RideModel   // peer's recordingSince
+    @ObservedObject var model: RideModel   // peer's recording clock
     var compact = false
     @State private var confirmStop = false
 
     var body: some View {
         HStack(spacing: 8) {
-            if let since = core.recordingSince {
+            if let rec = core.recording {
                 VStack(alignment: .leading, spacing: 3) {
-                    Eyebrow(text: store.active.map { "Session · \($0.samples.count) samples" }
+                    Eyebrow(text: rec.isPaused ? "Paused"
+                            : store.active.map { "Session · \($0.samples.count) samples" }
                             ?? "Recording on \(PeerLink.peerLabel)")
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                        Text(clock(ctx.date.timeIntervalSince(since)))
+                        Text(clock(rec.elapsed(at: ctx.date)))
                             .font(.system(size: compact ? 18 : 22, weight: .semibold))
                             .monospacedDigit()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modifier(Tile(padding: compact ? 10 : 14))
+                Button { core.setPaused(!rec.isPaused) } label: {
+                    Image(systemName: rec.isPaused ? "play.fill" : "pause.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, compact ? 14 : 18)
+                        .padding(.vertical, compact ? 15 : 20)
+                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.primary.opacity(0.08)))
+                }
+                .buttonStyle(.plain)
+                .help(rec.isPaused ? "Resume" : "Pause")
                 Button { confirmStop = true } label: {
                     Label("Stop", systemImage: "stop.fill")
                         .font(.subheadline.weight(.semibold))
@@ -78,6 +89,13 @@ struct SessionsTab: View {
                         LiveSessionDetail(store: store)
                     } else if let s = store.past.first(where: { $0.id == id }) {
                         SessionDetail(session: s)
+                            .toolbar {
+                                if core.recording == nil {
+                                    Button { core.continueSession(s) } label: {
+                                        Label("Continue", systemImage: "record.circle")
+                                    }
+                                }
+                            }
                     }
                 }
                 // Stopped (here or from the other device): leave the live view.
