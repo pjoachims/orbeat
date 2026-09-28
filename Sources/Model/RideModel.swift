@@ -38,7 +38,7 @@ final class RideModel: ObservableObject {
     /// Instantaneous power from a BLE cycling power meter (KICKR etc.); nil = none connected.
     @Published var watts: Int? = nil
     @Published var cadence: Int? = nil        // crank RPM
-    @Published var speedKmh: Double? = nil    // virtual speed from wheel revs
+    @Published var speedKmh: Double? = nil    // road-model speed from power (RoadSpeed)
     @Published var powerSource: String = ""
     /// Trainer ERG target in watts, driven by the Zwift Ride shifter buttons. Persisted.
     /// Trainer sim grade in 0.01% units (0 = flat). Default flat so it never

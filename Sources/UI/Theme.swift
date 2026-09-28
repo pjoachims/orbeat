@@ -185,7 +185,7 @@ struct MetricTile: View {
 }
 
 /// Current trainer target with − / + steppers (same policy as the paddles)
-/// and a Sim / ERG / Resistance switch.
+/// and a Sim / ERG switch.
 struct TrainerStepper: View {
     let mode: TrainerMode?
     var padding: CGFloat = 12
