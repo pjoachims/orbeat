@@ -60,7 +60,7 @@ struct Session: Codable, Identifiable {
 
 /// Start/stop a session and keep the finished ones. History lives in
 /// SwiftData; `.automatic` syncs it via the iCloud container named in the
-/// entitlements, or stays local when the build has none.
+/// entitlements, or stays local when the build has none or sync is off.
 /// ponytail: `past` decodes every session on each change; page it past ~500 sessions.
 final class SessionStore: ObservableObject {
     @Published private(set) var active: Session?
@@ -82,13 +82,18 @@ final class SessionStore: ObservableObject {
         .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Orbeat/sessions.store")
 
+    /// iCloud sync on/off (history + threshold); read once at launch.
+    static let cloudSyncKey = "iCloudSync"
+    static var cloudSync: Bool { UserDefaults.standard.object(forKey: cloudSyncKey) as? Bool ?? true }
+
     init() {
         let container: ModelContainer
         do {
             try FileManager.default.createDirectory(at: Self.storeURL.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
             container = try ModelContainer(for: SessionRecord.self,
-                                           configurations: ModelConfiguration(url: Self.storeURL))
+                                           configurations: ModelConfiguration(url: Self.storeURL,
+                                                                              cloudKitDatabase: Self.cloudSync ? .automatic : .none))
         } catch { fatalError("SwiftData store: \(error)") }
         context = ModelContext(container)
         importLegacy()

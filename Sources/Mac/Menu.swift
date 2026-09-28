@@ -48,6 +48,11 @@ extension AppDelegate {
         shareItem.target = self
         shareItem.state = (ble?.proxy.enabled ?? false) ? .on : .off
         menu.addItem(shareItem)
+        let cloudItem = NSMenuItem(title: "Sync History via iCloud",
+                                   action: #selector(toggleICloud), keyEquivalent: "")
+        cloudItem.target = self
+        cloudItem.state = SessionStore.cloudSync ? .on : .off
+        menu.addItem(cloudItem)
         let logItem = NSMenuItem(title: "Log to DuckDB (JSONL)",
                                  action: #selector(toggleDuckDBLog), keyEquivalent: "")
         logItem.target = self
@@ -82,6 +87,16 @@ extension AppDelegate {
 
     @objc func harder() { applyRidePress([.shiftUp]) }
     @objc func easier() { applyRidePress([.shiftDown]) }
+
+    /// The session store picks its CloudKit mode at launch: relaunch to apply.
+    @objc func toggleICloud() {
+        UserDefaults.standard.set(!SessionStore.cloudSync, forKey: SessionStore.cloudSyncKey)
+        let relaunch = Process()
+        relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+        relaunch.arguments = ["-c", "sleep 1; open \"$0\"", Bundle.main.bundlePath]
+        try? relaunch.run()
+        NSApp.terminate(nil)
+    }
 
     @objc func toggleDuckDBLog() {
         recorder.recording.toggle()
