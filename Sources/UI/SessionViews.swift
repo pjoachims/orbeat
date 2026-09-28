@@ -1,29 +1,33 @@
 import SwiftUI
 import Charts
 
-/// Start/stop row on the main screen: elapsed clock while recording,
-/// history button otherwise.
+/// Start/stop row: elapsed clock while a session records here or on the
+/// peer (stop works for both), start button otherwise.
 struct SessionBar: View {
     let core: AppCore
     @ObservedObject var store: SessionStore
+    @ObservedObject var model: RideModel   // peer's recordingSince
+    var compact = false
 
     var body: some View {
         HStack(spacing: 8) {
-            if let s = store.active {
+            if let since = core.recordingSince {
                 VStack(alignment: .leading, spacing: 3) {
-                    Eyebrow(text: "Session · \(s.samples.count) samples")
-                    Text(clock(store.elapsed))
-                        .font(.system(size: 22, weight: .semibold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
+                    Eyebrow(text: store.active.map { "Session · \($0.samples.count) samples" }
+                            ?? "Recording on \(PeerLink.peerLabel)")
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        Text(clock(ctx.date.timeIntervalSince(since)))
+                            .font(.system(size: compact ? 18 : 22, weight: .semibold))
+                            .monospacedDigit()
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .modifier(Tile(padding: 14))
+                .modifier(Tile(padding: compact ? 10 : 14))
                 Button { core.stopSession() } label: {
                     Label("Stop", systemImage: "stop.fill")
                         .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 20)
+                        .padding(.horizontal, compact ? 14 : 18)
+                        .padding(.vertical, compact ? 15 : 20)
                         .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(orbeatRed.opacity(0.2)))
                         .foregroundStyle(orbeatRed)
@@ -40,9 +44,10 @@ struct SessionBar: View {
             Label(title, systemImage: symbol)
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
+                .padding(.vertical, compact ? 10 : 13)
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(.primary.opacity(0.08)))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

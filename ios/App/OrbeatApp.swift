@@ -50,6 +50,7 @@ struct ContentView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("ORBEAT").font(.system(size: 12, weight: .bold)).kerning(2.2)
                 Spacer()
+                PeerBadge(model: model)
                 LiveDot(live: model.isFresh)
             }
             Text(model.hasData ? model.sourceName : model.bleStatus)
@@ -96,11 +97,12 @@ struct ContentView: View {
                 MetricTile(label: "km/h", value: speedTxt, valueSize: 26, padding: 14)
             }
             if model.trainerControllable {
-                TrainerStepper(mode: model.trainerMode, padding: 14) { applyRidePress([$0]) }
+                TrainerStepper(mode: model.trainerMode, padding: 14,
+                               onStep: { applyRidePress([$0]) }, onSet: core.setTrainer)
                     .padding(.top, 8)
             }
 
-            SessionBar(core: core, store: store)
+            SessionBar(core: core, store: store, model: model)
                 .padding(.top, 8)
 
             Spacer(minLength: 16)

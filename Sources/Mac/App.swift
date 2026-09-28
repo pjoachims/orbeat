@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     var floatingPanel: NSPanel?
     var warningPanel: NSPanel?
+    var sessionsWindow: NSWindow?
     private var bpmObserver: AnyObject?
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -38,9 +39,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover = NSPopover()
         popover.behavior = .transient
-        let host = NSHostingController(
-            rootView: HeartCard(model: model, compact: true,
-                                onStep: { [weak self] in self?.applyRidePress([$0]) }).padding(2))
+        let host = NSHostingController(rootView: VStack(spacing: 0) {
+            HeartCard(model: model, compact: true,
+                      onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer)
+            SessionBar(core: core, store: core.store, model: model, compact: true)
+                .padding([.horizontal, .bottom], 16)
+        }
+        .frame(width: 272)
+        .padding(2))
         host.sizingOptions = .preferredContentSize   // popover tracks the card's size
         popover.contentViewController = host
 
@@ -52,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } as AnyObject
 
         if CommandLine.arguments.contains("--float") { toggleFloating() }
+        if CommandLine.arguments.contains("--sessions") { showSessions() }
     }
 
     func applyRidePress(_ inputs: [HandlebarInput]) { inputs.forEach(core.step) }

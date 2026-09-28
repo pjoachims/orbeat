@@ -76,10 +76,20 @@ final class SessionStore: ObservableObject {
         .urls(for: .documentDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("sessions.json")
 
+    /// Own folder: the Mac app isn't sandboxed, so the default
+    /// "default.store" would be shared with every other unsandboxed app.
+    static let storeURL = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Orbeat/sessions.store")
+
     init() {
         let container: ModelContainer
-        do { container = try ModelContainer(for: SessionRecord.self) }
-        catch { fatalError("SwiftData store: \(error)") }
+        do {
+            try FileManager.default.createDirectory(at: Self.storeURL.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            container = try ModelContainer(for: SessionRecord.self,
+                                           configurations: ModelConfiguration(url: Self.storeURL))
+        } catch { fatalError("SwiftData store: \(error)") }
         context = ModelContext(container)
         importLegacy()
         reload()
