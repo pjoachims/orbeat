@@ -25,7 +25,7 @@ struct PeerState: Codable, Equatable {
 enum PeerCommand: Equatable {
     case step(HandlebarInput)
     case setTrainer(TrainerMode)
-    case startSession
+    /// Stop the session the receiver is recording (sessions record where started).
     case stopSession
 }
 
@@ -41,7 +41,7 @@ enum PeerWire {
         var s: PeerState?
         var step: Int?          // +1 up, -1 down
         var set: TrainerMode?
-        var sess: Bool?         // true start, false stop
+        var stop: Bool?
     }
 
     static func encode(_ m: PeerMessage) -> Data {
@@ -50,8 +50,7 @@ enum PeerWire {
         case .state(let s): e.s = s
         case .command(.step(let i)): e.step = i == .shiftUp ? 1 : -1
         case .command(.setTrainer(let t)): e.set = t
-        case .command(.startSession): e.sess = true
-        case .command(.stopSession): e.sess = false
+        case .command(.stopSession): e.stop = true
         }
         return (try? encoder.encode(e)) ?? Data()
     }
@@ -61,7 +60,7 @@ enum PeerWire {
         if let s = e.s { return .state(s) }
         if let s = e.step { return .command(.step(s > 0 ? .shiftUp : .shiftDown)) }
         if let t = e.set { return .command(.setTrainer(t)) }
-        if let s = e.sess { return .command(s ? .startSession : .stopSession) }
+        if e.stop == true { return .command(.stopSession) }
         return nil
     }
 

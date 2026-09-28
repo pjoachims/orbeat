@@ -13,7 +13,6 @@ enum PeerWireTests {
             .command(.step(.shiftDown)),
             .command(.setTrainer(.erg(targetWatts: 250))),
             .command(.setTrainer(.sim(grade: -500))),
-            .command(.startSession),
             .command(.stopSession),
         ]
         for m in messages {

@@ -4,6 +4,7 @@ import Charts
 /// Start/stop row on the main screen: elapsed clock while recording,
 /// history button otherwise.
 struct SessionBar: View {
+    let core: AppCore
     @ObservedObject var store: SessionStore
 
     var body: some View {
@@ -18,7 +19,7 @@ struct SessionBar: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modifier(Tile(padding: 14))
-                Button { store.stop() } label: {
+                Button { core.stopSession() } label: {
                     Label("Stop", systemImage: "stop.fill")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 18)
@@ -29,7 +30,7 @@ struct SessionBar: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                action("Start session", "record.circle") { store.start() }
+                action("Start session", "record.circle") { core.startSession() }
             }
         }
     }
@@ -56,6 +57,7 @@ func clock(_ t: TimeInterval) -> String {
 /// Sessions tab: the running session's KPIs and charts while recording,
 /// otherwise totals plus the history list.
 struct SessionsTab: View {
+    let core: AppCore
     @ObservedObject var store: SessionStore
     // ponytail: charts redraw from a 5 s snapshot, not every 1 Hz sample —
     // only the clock in the title ticks per second.
@@ -69,7 +71,7 @@ struct SessionsTab: View {
                     SessionDetail(session: s)
                         .navigationTitle("Recording · \(clock(store.elapsed))")
                         .toolbar {
-                            Button("Stop", systemImage: "stop.fill") { store.stop() }
+                            Button("Stop", systemImage: "stop.fill") { core.stopSession() }
                                 .tint(orbeatRed)
                         }
                 } else {
@@ -98,7 +100,7 @@ struct SessionsTab: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
-                Button { store.start() } label: {
+                Button { core.startSession() } label: {
                     Label("Start session", systemImage: "record.circle")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)

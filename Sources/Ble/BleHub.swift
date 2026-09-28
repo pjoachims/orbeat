@@ -17,9 +17,6 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     struct Device {
         let peripheral: CBPeripheral
         let isPower: Bool
-        /// Another Orbeat relaying HR + power + trainer control (advertises
-        /// 180D and 1818 together). Takes the power slot once 1818 is discovered.
-        var isBridge: Bool = false
         /// A Zwift Play/Ride handlebar controller — an input device, not a sensor.
         var isRide: Bool = false
         /// Advertised a standard HR/power service. False only for devices found
@@ -69,8 +66,14 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     }
 
     private var discoveryServices: [CBUUID] {
-        unique(drivers.flatMap { $0.scannedServices } + [Trainer.service, ZwiftRideController.service])
+        unique(drivers.flatMap { $0.scannedServices }
+               + [Trainer.service, ZwiftRideController.service, Self.appleContinuity])
     }
+
+    /// Every iPhone/Mac exposes this; no sensor does. An Apple device in a
+    /// sensor slot is another Orbeat's share proxy — its data arrives over the
+    /// peer link instead, and taking it here too double-feeds the model.
+    static let appleContinuity = CBUUID(string: "D0611E78-BBB4-4591-A5F8-487910AE4366")
 
     func isConnected(_ d: Device) -> Bool { d.peripheral.state == .connected }
     func isKnown(_ d: Device) -> Bool { known.contains(d.peripheral.identifier.uuidString) }
@@ -96,9 +99,6 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         } else {
             if let p = hrPeripheral, p !== d.peripheral { central.cancelPeripheralConnection(p) }
             hrPeripheral = d.peripheral
-            // A bridge takes the power slot too — but only once discovery
-            // proves 1818 (didDiscoverServices), not here: a bonded phone
-            // accepts the link even with Orbeat closed, GATT table empty.
         }
         d.peripheral.delegate = self
         emit(.status("Connecting \(d.name)…"))
@@ -174,8 +174,8 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         let nameHit = (peripheral.name ?? advName ?? "").localizedCaseInsensitiveContains("zwift")
         let isRide = advertised.contains(ZwiftRideController.service) || nameHit
         let isPower = powerDriver.matches(peripheral.name ?? advName, advertisedServices: advertised)
-        let isBridge = advertised.contains(HeartRateDriver.hrService)
-            && advertised.contains(PowerDriver.powerService)
+        // Another Orbeat (peer link or share proxy): never a sensor here.
+        if advName == "Orbeat" || advertised.contains(PeerUUID.service) { return }
         // Filtered scans imply a sensor even when the callback omits the service list.
         let isSensor = !scanningAll || advertised.contains(HeartRateDriver.hrService)
             || advertised.contains(PowerDriver.powerService) || isRide
@@ -183,21 +183,18 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         if !discovered.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
             log(["src": "ble", "ev": "found", "name": peripheral.name ?? advName ?? "?",
                  "adv": advertised.map { $0.uuidString }])
-            discovered.append(Device(peripheral: peripheral, isPower: isPower, isBridge: isBridge,
+            discovered.append(Device(peripheral: peripheral, isPower: isPower,
                                      isRide: isRide, isSensor: isSensor, advName: advName))
         }
         // Auto-connect only devices the user has connected before; new ones
-        // wait in the "Connect Equipment" menu. A known bridge (the phone) is
-        // preferred over a direct trainer link: one hop, phone owns the bike.
-        // ponytail: a Mac and a phone that both rebroadcast AND know each other
-        // would relay in a loop — don't "Connect" your own Mac from the phone.
+        // wait in the Equipment list.
         let slotFree = isRide ? ridePeripheral == nil
                      : isPower ? powerPeripheral == nil : hrPeripheral == nil
         guard isSensor, slotFree else { return }
         if known.contains(peripheral.identifier.uuidString) {
-            connect(Device(peripheral: peripheral, isPower: isPower, isBridge: isBridge, isRide: isRide))
+            connect(Device(peripheral: peripheral, isPower: isPower, isRide: isRide))
         } else {
-            emit(.status("Found \(peripheral.name ?? "device") — right-click → Connect Equipment"))
+            emit(.status("Found \(peripheral.name ?? advName ?? "device") — connect it under Equipment"))
         }
     }
 
@@ -249,11 +246,13 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         log(["src": "ble", "ev": "services", "name": peripheral.name ?? "?",
              "uuids": (peripheral.services ?? []).map { $0.uuid.uuidString },
              "err": error?.localizedDescription ?? ""])
-        if peripheral === hrPeripheral, peripheral !== powerPeripheral,
-           peripheral.services?.contains(where: { $0.uuid == PowerDriver.powerService }) == true {
-            // Bridge proven: it now owns power + trainer; drop the direct trainer link.
-            if let p = powerPeripheral { central.cancelPeripheralConnection(p) }
-            powerPeripheral = peripheral
+        if peripheral.services?.contains(where: { $0.uuid == Self.appleContinuity }) == true {
+            log(["src": "ble", "ev": "appleDeviceDropped", "name": peripheral.name ?? "?"])
+            discovered.removeAll { $0.peripheral.identifier == peripheral.identifier }
+            known.remove(peripheral.identifier.uuidString)
+            UserDefaults.standard.set(Array(known), forKey: "knownDevices")
+            central.cancelPeripheralConnection(peripheral)
+            return
         }
         // All characteristics, not just the ones we decode: the proxy mirrors
         // the full service so downstream clients get the real thing.
@@ -346,7 +345,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         switch characteristic.uuid {
         case _ where ZwiftRideController.isButtonChar(characteristic.uuid):
             // Accept button frames from any peripheral exposing the Zwift service
-            // (both a standalone Zwift Ride and the KICKR bridge can appear).
+            // (both a standalone Zwift Ride and the KICKR's built-in relay can appear).
             // Raw log every notification so we can see the actual frame format.
             var ev: [String: Any] = ["src": "zwiftraw",
                  "char": characteristic.uuid.uuidString.suffix(4).description,
@@ -362,10 +361,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
             if frame.newlyPressed.contains(where: { $0 & ZwiftButtonFrame.shiftDown != 0 }) {
                 inputs.append(.shiftDown)
             }
-            // An Orbeat bridge already acted on the press and mirrors the
-            // resulting mode via 2ADA — acting here too would double-step.
-            let viaBridge = discovered.contains { $0.peripheral === peripheral && $0.isBridge }
-            if !inputs.isEmpty, !viaBridge { emit(.handlebar(inputs)) }
+            if !inputs.isEmpty { emit(.handlebar(inputs)) }
             var rideEv: [String: Any] = ["src": "ride", "raw": frame.raw,
                                          "pressed": frame.pressed]
             if let n = deviceName(peripheral) { rideEv["device"] = n }

@@ -71,11 +71,12 @@ final class SessionStore: ObservableObject {
         save()
     }
 
-    /// Call once a second. Records only fresh readings, so a dropped strap
-    /// leaves a gap rather than a flat line.
+    /// Call on every reading and once a second; samples at most 1 Hz. Records
+    /// only fresh readings, so a dropped strap leaves a gap, not a flat line.
     func tick(_ m: RideModel) {
         guard active != nil else { return }
         elapsed = active!.duration
+        if let last = active!.samples.last, elapsed - last.t < 0.95 { return }
         let live = m.hasData && m.isFresh
         let s = Session.Sample(t: elapsed, bpm: live ? m.bpm : nil,
                                watts: m.displayWatts, rpm: m.displayCadence, kmh: m.displaySpeedKmh)

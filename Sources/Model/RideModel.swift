@@ -55,6 +55,24 @@ final class RideModel: ObservableObject {
     /// True once a real BLE device feeds data — suspends the simulator.
     private(set) var isLive = false
 
+    // MARK: Peer link
+
+    /// The other Orbeat (iPhone ↔ Mac) is connected.
+    @Published var peerConnected = false
+    /// Latest state from the peer: its directly connected sensors, trainer, session.
+    @Published var peer: PeerState?
+    /// A trainer is attached to THIS device (vs. controlled through the peer).
+    @Published var localTrainer = false
+    /// Readings from sensors connected to THIS device — what the peer link
+    /// publishes. Local wins over peer while it is fresh.
+    var directBPM: Int?
+    var directBPMAt = Date.distantPast
+    var directHRSource = ""
+    var directPower: PowerReading?
+    var directPowerAt = Date.distantPast
+    var directPowerSource = ""
+    static let directWindow: TimeInterval = 5
+
     private var timer: AnyCancellable?
     private var freshTimer: AnyCancellable?
 
