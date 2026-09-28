@@ -14,6 +14,7 @@ swiftc -O \
   Sources/Core/TrainerMode.swift \
   Sources/Core/RideButtons.swift \
   Sources/Core/PeerWire.swift \
+  Sources/Core/Curve.swift \
   Sources/Drivers/Standard/CyclingPower.swift \
   Sources/Drivers/Standard/FtmsIndoorBike.swift \
   Sources/Drivers/Standard/FtmsMachineStatus.swift \
@@ -25,6 +26,7 @@ swiftc -O \
   Tests/TrainerModeTests.swift \
   Tests/ZwiftTests.swift \
   Tests/PeerWireTests.swift \
+  Tests/CurveTests.swift \
   Tests/main.swift \
   -o "$OUT/orbeat-tests"
 

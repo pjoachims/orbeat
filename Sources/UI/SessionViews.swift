@@ -134,19 +134,15 @@ struct SessionsTab: View {
 }
 
 /// The running session's charts. Observes the store itself (a pushed
-/// navigation destination doesn't reliably refresh from its parent).
-/// ponytail: charts redraw from a 5 s snapshot, not every 1 Hz sample;
-/// the clock in the title ticks per second.
+/// navigation destination doesn't reliably refresh from its parent), so
+/// clock and charts follow each 1 Hz sample.
 struct LiveSessionDetail: View {
     @ObservedObject var store: SessionStore
-    @State private var snapshot: Session?
-    private let refresh = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        if let s = snapshot ?? store.active {
+        if let s = store.active {
             SessionDetail(session: s)
                 .navigationTitle("Recording · \(clock(store.elapsed))")
-                .onReceive(refresh) { _ in snapshot = store.active }
         }
     }
 }
@@ -154,6 +150,8 @@ struct LiveSessionDetail: View {
 /// Stats + heart-rate / power over time.
 struct SessionDetail: View {
     let session: Session
+    /// Moving-average window in seconds, 0 = raw.
+    @AppStorage("chartSmoothing") private var window = 30.0
 
     var body: some View {
         ScrollView {
@@ -168,10 +166,17 @@ struct SessionDetail: View {
                         MetricTile(label: "km", value: String(format: "%.1f", session.distanceKm))
                     }
                 }
+                Picker("Smoothing", selection: $window) {
+                    Text("Raw").tag(0.0)
+                    Text("10 s").tag(10.0)
+                    Text("30 s").tag(30.0)
+                    Text("1 min").tag(60.0)
+                }
+                .pickerStyle(.segmented)
                 if !session.bpms.isEmpty {
                     Eyebrow(text: "Heart rate")
-                    Chart(thin(session.samples.filter { $0.bpm != nil }), id: \.t) { s in
-                        LineMark(x: .value("min", s.t / 60), y: .value("bpm", s.bpm!))
+                    Chart(curve(\.bpm), id: \.t) { p in
+                        LineMark(x: .value("min", p.t / 60), y: .value("bpm", p.v))
                             .foregroundStyle(orbeatRed)
                     }
                     .chartYScale(domain: .automatic(includesZero: false))
@@ -180,8 +185,8 @@ struct SessionDetail: View {
                 }
                 if !session.wattsAll.isEmpty {
                     Eyebrow(text: "Power")
-                    Chart(thin(session.samples.filter { $0.watts != nil }), id: \.t) { s in
-                        LineMark(x: .value("min", s.t / 60), y: .value("W", s.watts!))
+                    Chart(curve(\.watts), id: \.t) { p in
+                        LineMark(x: .value("min", p.t / 60), y: .value("W", p.v))
                             .foregroundStyle(.yellow)
                     }
                     .frame(height: 160)
@@ -195,10 +200,10 @@ struct SessionDetail: View {
         #endif
     }
 
-    /// Keep charts cheap: at most ~600 points, every n-th sample.
-    private func thin(_ xs: [Session.Sample]) -> [Session.Sample] {
-        let n = max(1, xs.count / 600)
-        return n == 1 ? xs : xs.enumerated().filter { $0.offset % n == 0 }.map(\.element)
+    /// Smoothed over the full-res samples, then thinned so charts stay cheap.
+    private func curve(_ metric: KeyPath<Session.Sample, Int?>) -> [Curve.Point] {
+        let pts = session.samples.compactMap { s in s[keyPath: metric].map { Curve.Point(t: s.t, v: Double($0)) } }
+        return Curve.thin(Curve.smooth(pts, window: window))
     }
 
     /// Time-in-zone bar, one segment per zone.
