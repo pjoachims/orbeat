@@ -134,16 +134,18 @@ final class GattProxy: NSObject, CBPeripheralManagerDelegate {
     /// Live manager, only while mirrored services should be published.
     private var sharing: CBPeripheralManager? { enabled ? live : nil }
 
-    /// Re-advertise the current set. Hosted services first, then mirrored
-    /// 16-bit UUIDs only: a mirrored 128-bit UUID eats 18 of the 31 bytes and
-    /// pushes 180D/1818 into Apple's overflow area, invisible to non-Apple
-    /// clients. Connected clients still discover the 128-bit services.
+    /// Re-advertise the current set. Mirrored 16-bit UUIDs first, 128-bit
+    /// ones after: a 128-bit UUID eats 18 of the 31 bytes and pushes whatever
+    /// follows into Apple's overflow area, invisible to non-Apple clients.
+    /// The hosted peer UUID can live there — PeerClient scans for it by UUID,
+    /// which iOS matches in the overflow. Mirrored 128-bit services are never
+    /// advertised; connected clients still discover them.
     private func advertise() {
         guard let live else { return }
         live.stopAdvertising()
         let short = enabled
             ? services.keys.filter { $0.data.count == 2 }.sorted { $0.uuidString < $1.uuidString } : []
-        let uuids = hosted.map(\.uuid) + short
+        let uuids = short + hosted.map(\.uuid)
         guard !uuids.isEmpty else { return }
         live.startAdvertising([
             CBAdvertisementDataLocalNameKey: "Orbeat",

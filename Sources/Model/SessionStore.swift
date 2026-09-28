@@ -112,8 +112,11 @@ final class SessionStore: ObservableObject {
     }
 
     func delete(_ session: Session) {
+        // Per-object delete: a batch delete (delete(model:where:)) bypasses
+        // CloudKit mirroring, so the other device would keep the session.
         let id = session.id
-        try? context.delete(model: SessionRecord.self, where: #Predicate { $0.id == id })
+        let match = FetchDescriptor<SessionRecord>(predicate: #Predicate { $0.id == id })
+        ((try? context.fetch(match)) ?? []).forEach(context.delete)
         save()
     }
 
@@ -130,7 +133,7 @@ final class SessionStore: ObservableObject {
     }
 
     private func save() {
-        try? context.save()
+        do { try context.save() } catch { NSLog("Orbeat: session save failed: \(error)") }
         reload()
     }
 
@@ -139,16 +142,15 @@ final class SessionStore: ObservableObject {
         past = ((try? context.fetch(all)) ?? []).map(\.session)
     }
 
-    /// Moves the old sessions.json into SwiftData. Renamed first, so it is
-    /// never imported twice (CloudKit can't dedupe by id); the renamed file
-    /// stays as a backup.
+    /// Moves the old sessions.json into SwiftData, then renames it (kept as a
+    /// backup) so it is not imported twice — CloudKit can't dedupe by id. A
+    /// failed save leaves the file in place to retry next launch.
     private func importLegacy() {
         let url = Self.legacyURL
         guard let data = try? Data(contentsOf: url),
-              let old = try? JSONDecoder().decode([Session].self, from: data),
-              (try? FileManager.default.moveItem(at: url, to: url.appendingPathExtension("imported"))) != nil
-        else { return }
+              let old = try? JSONDecoder().decode([Session].self, from: data) else { return }
         old.forEach { context.insert(SessionRecord($0)) }
-        try? context.save()
+        do { try context.save() } catch { context.rollback(); return }
+        try? FileManager.default.moveItem(at: url, to: url.appendingPathExtension("imported"))
     }
 }

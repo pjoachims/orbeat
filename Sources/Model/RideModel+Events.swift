@@ -70,7 +70,9 @@ extension RideModel {
             powerSource = "\(s.powerSource ?? "Power") · via \(label)"
             showPower(w, s.cadence, s.kmh)
         }
-        if !localTrainer {
+        // Guarded: states arrive every second; unchanged writes would
+        // re-render every view and hit UserDefaults each time.
+        if !localTrainer, trainerMode != s?.trainer {
             trainerControllable = s?.trainer != nil
             trainerMode = s?.trainer
             if case .sim(let g) = s?.trainer { grade = g }
