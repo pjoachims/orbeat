@@ -10,7 +10,7 @@ settings:
     SWIFT_VERSION: "5.9"
     DEVELOPMENT_TEAM: UVB62X4VVB
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: "2.0"
+    MARKETING_VERSION: "1.0.1"
     CURRENT_PROJECT_VERSION: "1"
 
 # iCloud: one CloudKit container (session history) and one shared key-value
@@ -38,6 +38,8 @@ targets:
     info:
       path: Mac/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleName: Orbeat
         CFBundleDisplayName: Orbeat
         CFBundleIconFile: Orbeat
@@ -73,6 +75,8 @@ targets:
     info:
       path: ios/App/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Orbeat
         UILaunchScreen: {}
         NSSupportsLiveActivities: true
@@ -101,6 +105,8 @@ targets:
     info:
       path: ios/Widget/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Orbeat
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension

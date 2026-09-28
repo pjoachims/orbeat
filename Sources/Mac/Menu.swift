@@ -34,11 +34,11 @@ extension AppDelegate {
                                     action: nil, keyEquivalent: "")
             target.isEnabled = false
             menu.addItem(target)
-            let harder = NSMenuItem(title: "Harder (\(mode?.stepLabel ?? "+1 %"))",
+            let harder = NSMenuItem(title: "Harder (\(mode?.stepLabel ?? "+0.5 %"))",
                                     action: #selector(harder), keyEquivalent: "")
             harder.target = self
             menu.addItem(harder)
-            let easier = NSMenuItem(title: "Easier (\((mode?.stepLabel ?? "+1 %").replacingOccurrences(of: "+", with: "−"))",
+            let easier = NSMenuItem(title: "Easier (\((mode?.stepLabel ?? "+0.5 %").replacingOccurrences(of: "+", with: "−"))",
                                     action: #selector(easier), keyEquivalent: "")
             easier.target = self
             menu.addItem(easier)

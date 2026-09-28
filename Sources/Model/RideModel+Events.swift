@@ -35,7 +35,7 @@ extension RideModel {
             directPower = p
             directPowerAt = now
             powerSource = directPowerSource
-            showPower(p.watts, p.cadence, p.kmh)
+            showPower(p.watts, p.cadence)
         case .handlebar:
             break   // routed by AppCore: the trainer may live on the peer
         case .trainerReady:
@@ -68,7 +68,7 @@ extension RideModel {
         }
         if let s, let w = s.watts, now.timeIntervalSince(directPowerAt) > Self.directWindow {
             powerSource = "\(s.powerSource ?? "Power") · via \(label)"
-            showPower(w, s.cadence, s.kmh)
+            showPower(w, s.cadence)
         }
         // Guarded: states arrive every second; unchanged writes would
         // re-render every view and hit UserDefaults each time.
@@ -91,7 +91,7 @@ extension RideModel {
                          recordingSince: recordingSince)
     }
 
-    /// Step the LOCAL trainer's current mode: ERG ±10 W, resistance ±10 %, sim ±1 %.
+    /// Step the LOCAL trainer's current mode: ERG ±5 W, resistance ±10 %, sim ±0.5 %.
     func press(_ inputs: [HandlebarInput], ble: BLEManager?) {
         guard var mode = trainerMode else { return }   // no trainer target yet
         for input in inputs {
@@ -106,10 +106,12 @@ extension RideModel {
         if case .sim(let g) = trainerMode { grade = g }   // persist sim grade
     }
 
-    private func showPower(_ w: Int, _ c: Int?, _ kmh: Double?) {
+    private func showPower(_ w: Int, _ c: Int?) {
         watts = w
         cadence = c
-        speedKmh = kmh
+        // Road-model speed, not the trainer's wheel speed (bogus in ERG).
+        if case .sim(let g) = trainerMode { speedKmh = RoadSpeed.kmh(watts: w, gradePercent: Double(g) / 100) }
+        else { speedKmh = RoadSpeed.kmh(watts: w) }
         touch()   // power packets count as a sync too
     }
 }

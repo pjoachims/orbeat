@@ -194,7 +194,7 @@ struct TrainerStepper: View {
 
     /// Switching kind starts from a gentle target, never a hard wall.
     private static let kinds: [(String, TrainerMode)] =
-        [("Sim", .sim(grade: 0)), ("ERG", .erg(targetWatts: 120)), ("Res", .resistance(percent: 20))]
+        [("Sim", .sim(grade: 0)), ("ERG", .erg(targetWatts: 120))]
 
     var body: some View {
         VStack(spacing: 10) {
