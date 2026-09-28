@@ -63,42 +63,25 @@ func clock(_ t: TimeInterval) -> String {
                      : String(format: "%d:%02d", s / 60, s % 60)
 }
 
-/// Sessions tab: totals and history, with the running session as the top
-/// row — open it for live charts, go back to browse, stop only on purpose.
+/// Sessions tab: the live session bar (here or on the peer), a link to the
+/// running session's charts, then totals and history.
 struct SessionsTab: View {
     let core: AppCore
     @ObservedObject var store: SessionStore
-    // ponytail: charts redraw from a 5 s snapshot, not every 1 Hz sample —
-    // only the clock in the title ticks per second.
-    @State private var snapshot: Session?
     @State private var path: [UUID] = []
-    @State private var confirmStop = false
-    private let refresh = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack(path: $path) {
             history
                 .navigationDestination(for: UUID.self) { id in
-                    if id == store.active?.id, let s = snapshot ?? store.active {
-                        SessionDetail(session: s)
-                            .navigationTitle("Recording · \(clock(store.elapsed))")
-                            .toolbar {
-                                Button("Stop", systemImage: "stop.fill") { confirmStop = true }
-                                    .tint(orbeatRed)
-                            }
+                    if id == store.active?.id {
+                        LiveSessionDetail(store: store)
                     } else if let s = store.past.first(where: { $0.id == id }) {
                         SessionDetail(session: s)
                     }
                 }
-                .onReceive(refresh) { _ in snapshot = store.active }
-                .onChange(of: store.active?.id) { _, id in
-                    snapshot = store.active
-                    // Stopped (here or from the other device): leave the live view.
-                    if id == nil { path.removeAll { !store.past.map(\.id).contains($0) } }
-                }
-                .confirmationDialog("Stop and save this session?", isPresented: $confirmStop) {
-                    Button("Stop session", role: .destructive) { core.stopSession() }
-                }
+                // Stopped (here or from the other device): leave the live view.
+                .onChange(of: store.active?.id) { old, _ in path.removeAll { $0 == old } }
         }
     }
 
@@ -116,28 +99,13 @@ struct SessionsTab: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                SessionBar(core: core, store: store, model: core.model)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 if let a = store.active {
                     NavigationLink(value: a.id) {
-                        HStack {
-                            Label("Recording", systemImage: "record.circle.fill")
-                                .foregroundStyle(orbeatRed)
-                            Spacer()
-                            Text(clock(store.elapsed)).monospacedDigit().foregroundStyle(.secondary)
-                        }
-                        .font(.subheadline.weight(.semibold))
+                        Label("Live charts", systemImage: "waveform.path.ecg")
                     }
-                } else if core.recordingSince == nil {
-                Button { core.startSession() } label: {
-                    Label("Start session", systemImage: "record.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.primary.opacity(0.08)))
-                }
-                .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
                 }
             }
             Section("History") {
@@ -162,6 +130,24 @@ struct SessionsTab: View {
             }
         }
         .navigationTitle("Sessions")
+    }
+}
+
+/// The running session's charts. Observes the store itself (a pushed
+/// navigation destination doesn't reliably refresh from its parent).
+/// ponytail: charts redraw from a 5 s snapshot, not every 1 Hz sample;
+/// the clock in the title ticks per second.
+struct LiveSessionDetail: View {
+    @ObservedObject var store: SessionStore
+    @State private var snapshot: Session?
+    private let refresh = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        if let s = snapshot ?? store.active {
+            SessionDetail(session: s)
+                .navigationTitle("Recording · \(clock(store.elapsed))")
+                .onReceive(refresh) { _ in snapshot = store.active }
+        }
     }
 }
 
