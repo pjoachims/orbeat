@@ -133,6 +133,7 @@ final class SessionStore: ObservableObject {
         // Nothing sampled (accidental tap, no sensors): nothing to keep.
         if s.samples.isEmpty { return }
         // A resumed session updates its record in place.
+        // ponytail: continued on both devices while unlinked, last save wins.
         let id = s.id
         let match = FetchDescriptor<SessionRecord>(predicate: #Predicate { $0.id == id })
         if let r = try? context.fetch(match).first {

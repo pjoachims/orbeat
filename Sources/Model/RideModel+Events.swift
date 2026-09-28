@@ -45,10 +45,12 @@ extension RideModel {
             // start in sim at the persisted grade (never resists hard on
             // connect) — after a grace period, so a peer link still coming
             // up can report its target first (adopted in apply(peer:)).
+            trainerAttach += 1
+            let attach = trainerAttach
             trainerMode = peer?.trainer
             guard trainerMode == nil else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak ble] in
-                guard let self, localTrainer, trainerMode == nil else { return }
+                guard let self, attach == trainerAttach, localTrainer, trainerMode == nil else { return }
                 trainerMode = ble?.setTrainerMode(.sim(grade: grade))
             }
         case .trainerLost:

@@ -70,6 +70,8 @@ final class RideModel: ObservableObject {
     @Published var peer: PeerState?
     /// A trainer is attached to THIS device (vs. controlled through the peer).
     @Published var localTrainer = false
+    /// Bumped per trainer attach, so a stale connect fallback can't fire.
+    var trainerAttach = 0
     /// Readings from sensors connected to THIS device — what the peer link
     /// publishes. Local wins over peer while it is fresh.
     var directBPM: Int?
