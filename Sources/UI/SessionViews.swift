@@ -8,6 +8,7 @@ struct SessionBar: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var model: RideModel   // peer's recordingSince
     var compact = false
+    @State private var confirmStop = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -23,7 +24,7 @@ struct SessionBar: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modifier(Tile(padding: compact ? 10 : 14))
-                Button { core.stopSession() } label: {
+                Button { confirmStop = true } label: {
                     Label("Stop", systemImage: "stop.fill")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, compact ? 14 : 18)
@@ -36,6 +37,9 @@ struct SessionBar: View {
             } else {
                 action("Start session", "record.circle") { core.startSession() }
             }
+        }
+        .confirmationDialog("Stop and save this session?", isPresented: $confirmStop) {
+            Button("Stop session", role: .destructive) { core.stopSession() }
         }
     }
 
@@ -59,35 +63,42 @@ func clock(_ t: TimeInterval) -> String {
                      : String(format: "%d:%02d", s / 60, s % 60)
 }
 
-/// Sessions tab: the running session's KPIs and charts while recording,
-/// otherwise totals plus the history list.
+/// Sessions tab: totals and history, with the running session as the top
+/// row — open it for live charts, go back to browse, stop only on purpose.
 struct SessionsTab: View {
     let core: AppCore
     @ObservedObject var store: SessionStore
     // ponytail: charts redraw from a 5 s snapshot, not every 1 Hz sample —
     // only the clock in the title ticks per second.
     @State private var snapshot: Session?
+    @State private var path: [UUID] = []
+    @State private var confirmStop = false
     private let refresh = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if store.active != nil, let s = snapshot ?? store.active {
-                    SessionDetail(session: s)
-                        .navigationTitle("Recording · \(clock(store.elapsed))")
-                        .toolbar {
-                            Button("Stop", systemImage: "stop.fill") { core.stopSession() }
-                                .tint(orbeatRed)
-                        }
-                } else {
-                    history
+        NavigationStack(path: $path) {
+            history
+                .navigationDestination(for: UUID.self) { id in
+                    if id == store.active?.id, let s = snapshot ?? store.active {
+                        SessionDetail(session: s)
+                            .navigationTitle("Recording · \(clock(store.elapsed))")
+                            .toolbar {
+                                Button("Stop", systemImage: "stop.fill") { confirmStop = true }
+                                    .tint(orbeatRed)
+                            }
+                    } else if let s = store.past.first(where: { $0.id == id }) {
+                        SessionDetail(session: s)
+                    }
                 }
-            }
-            .navigationDestination(for: UUID.self) { id in
-                if let s = store.past.first(where: { $0.id == id }) { SessionDetail(session: s) }
-            }
-            .onReceive(refresh) { _ in snapshot = store.active }
-            .onChange(of: store.active == nil) { _, _ in snapshot = store.active }
+                .onReceive(refresh) { _ in snapshot = store.active }
+                .onChange(of: store.active?.id) { _, id in
+                    snapshot = store.active
+                    // Stopped (here or from the other device): leave the live view.
+                    if id == nil { path.removeAll { !store.past.map(\.id).contains($0) } }
+                }
+                .confirmationDialog("Stop and save this session?", isPresented: $confirmStop) {
+                    Button("Stop session", role: .destructive) { core.stopSession() }
+                }
         }
     }
 
@@ -105,6 +116,17 @@ struct SessionsTab: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                if let a = store.active {
+                    NavigationLink(value: a.id) {
+                        HStack {
+                            Label("Recording", systemImage: "record.circle.fill")
+                                .foregroundStyle(orbeatRed)
+                            Spacer()
+                            Text(clock(store.elapsed)).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    }
+                } else if core.recordingSince == nil {
                 Button { core.startSession() } label: {
                     Label("Start session", systemImage: "record.circle")
                         .font(.subheadline.weight(.semibold))
@@ -116,6 +138,7 @@ struct SessionsTab: View {
                 .buttonStyle(.plain)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                }
             }
             Section("History") {
                 if store.past.isEmpty {

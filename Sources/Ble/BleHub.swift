@@ -214,6 +214,9 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         emit(.status("Couldn't connect \(peripheral.name ?? "device") · rescanning…"))
         log(["src": "ble", "ev": "failToConnect", "name": peripheral.name ?? "?",
              "err": error?.localizedDescription ?? ""])
+        // Restart discovery (duplicates are filtered per scan): without this a
+        // single failed reconnect left the Fitbit Air offline until relaunch.
+        scan()
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral,
