@@ -55,6 +55,16 @@ extension TrainerMode {
         }
     }
 
+    /// This kind at its last-used target: the picker switches kind, the value
+    /// comes back from memory. Resistance has no memory.
+    func resumed(ergWatts: Int, grade: Int) -> TrainerMode {
+        switch self {
+        case .erg: return .erg(targetWatts: ergWatts)
+        case .sim: return .sim(grade: grade)
+        case .resistance: return self
+        }
+    }
+
     var label: String {
         switch self {
         case .erg(let w): return "ERG · \(w) W"

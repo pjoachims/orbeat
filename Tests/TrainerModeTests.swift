@@ -17,5 +17,7 @@ struct TrainerModeTests {
             && TrainerMode.resistance(percent: 40).label == "Resistance · 40 %")
         check("step labels", TrainerMode.erg(targetWatts: 200).stepLabel == "+5 W"
             && TrainerMode.sim(grade: 150).stepLabel == "+0.5 %")
+        check("resume kind", TrainerMode.erg(targetWatts: 120).resumed(ergWatts: 175, grade: 250) == .erg(targetWatts: 175)
+            && TrainerMode.sim(grade: 0).resumed(ergWatts: 175, grade: 250) == .sim(grade: 250))
     }
 }

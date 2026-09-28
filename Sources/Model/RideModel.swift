@@ -40,7 +40,10 @@ final class RideModel: ObservableObject {
     @Published var cadence: Int? = nil        // crank RPM
     @Published var speedKmh: Double? = nil    // road-model speed from power (RoadSpeed)
     @Published var powerSource: String = ""
-    /// Trainer ERG target in watts, driven by the Zwift Ride shifter buttons. Persisted.
+    /// Last ERG target in watts, resumed when switching back to ERG. Persisted.
+    @Published var ergWatts: Int = UserDefaults.standard.object(forKey: "ergWatts") as? Int ?? 120 {
+        didSet { UserDefaults.standard.set(ergWatts, forKey: "ergWatts") }
+    }
     /// Trainer sim grade in 0.01% units (0 = flat). Default flat so it never
     /// resists hard until a paddle raises it.
     @Published var grade: Int = UserDefaults.standard.object(forKey: "grade") as? Int ?? 0 {
