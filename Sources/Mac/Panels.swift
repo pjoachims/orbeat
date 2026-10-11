@@ -104,7 +104,8 @@ extension AppDelegate {
         }
         let host = NSHostingController(rootView:
             HeartCard(model: model, compact: false,
-                      onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer)
+                      onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer,
+                      onStopRoute: { [weak self] in self?.core.ride(nil) })
                 .background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)

@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// The right-click menu and all its item actions.
 extension AppDelegate {
@@ -42,6 +43,10 @@ extension AppDelegate {
                                     action: #selector(easier), keyEquivalent: "")
             easier.target = self
             menu.addItem(easier)
+            let route = NSMenuItem(title: model.route == nil ? "Ride GPX Route…" : "Stop Route — \(model.route!.name)",
+                                   action: #selector(rideRoute), keyEquivalent: "")
+            route.target = self
+            menu.addItem(route)
         }
         menu.addItem(.separator())
         menu.addEquipmentSubmenu(from: ble, target: self)
@@ -92,6 +97,15 @@ extension AppDelegate {
 
     @objc func toggleRebroadcast() {
         ble?.proxy.enabled.toggle()
+    }
+
+    @objc func rideRoute() {
+        guard model.route == nil else { return core.ride(nil) }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "gpx") ?? .xml]
+        panel.message = "Ride a GPX track's hills in sim, at your road speed."
+        NSApp.activate()
+        if panel.runModal() == .OK, let url = panel.url { core.open(url) }
     }
 
     @objc func harder() { applyRidePress([.shiftUp]) }

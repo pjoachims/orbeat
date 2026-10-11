@@ -62,12 +62,12 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     }
 
     private var scanServices: [CBUUID] {
-        unique(drivers.flatMap { $0.scannedServices } + [ZwiftRideController.service])
+        unique(drivers.flatMap { $0.scannedServices } + ZwiftRideController.services)
     }
 
     private var discoveryServices: [CBUUID] {
         unique(drivers.flatMap { $0.scannedServices }
-               + [Trainer.service, ZwiftRideController.service, Self.appleContinuity])
+               + [Trainer.service, Self.appleContinuity] + ZwiftRideController.services)
     }
 
     /// Every iPhone/Mac exposes this; no sensor does. An Apple device in a
@@ -172,7 +172,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
         // Zwift Ride/Play advertise the service UUID only in the scan response, so
         // advertisementData often omits it — fall back to the name.
         let nameHit = (peripheral.name ?? advName ?? "").localizedCaseInsensitiveContains("zwift")
-        let isRide = advertised.contains(ZwiftRideController.service) || nameHit
+        let isRide = advertised.contains(where: ZwiftRideController.services.contains) || nameHit
         let isPower = powerDriver.matches(peripheral.name ?? advName, advertisedServices: advertised)
         // Another Orbeat (peer link or share proxy): never a sensor here.
         if advName == "Orbeat" || advertised.contains(PeerUUID.service) { return }
@@ -301,7 +301,7 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
                 }
             }
         }
-        if service.uuid == ZwiftRideController.service {
+        if ZwiftRideController.services.contains(service.uuid) {
             // Adopt as the Ride controller. The KICKR CORE bridges the Zwift Ride
             // shifters through its own Zwift service, so the SAME peripheral can be
             // both the power/trainer device and the button source — don't clear

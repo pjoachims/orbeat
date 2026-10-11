@@ -2,6 +2,7 @@ import SwiftUI
 import ActivityKit
 import UserNotifications
 import UIKit
+import UniformTypeIdentifiers
 
 @main
 struct OrbeatApp: App {
@@ -15,6 +16,7 @@ struct OrbeatApp: App {
                     .tabItem { Label("Sessions", systemImage: "chart.xyaxis.line") }
             }
             .preferredColorScheme(.dark)
+            .onOpenURL { core.open($0) }   // .gpx from Files/share sheet, orbeat://ride?gpx=
         }
     }
 }
@@ -27,6 +29,7 @@ struct ContentView: View {
     private var ble: BLEManager? { core.ble }
     @State private var activity: Activity<OrbeatAttributes>?
     @State private var showDevices = false
+    @State private var pendingRoute: URL?
     /// Vibrate/notify every N seconds while over threshold; 0 = off.
     @AppStorage("vibrateEvery") private var vibrateEvery = 10
     @State private var lastBuzz = Date.distantPast
@@ -104,9 +107,14 @@ struct ContentView: View {
                 MetricTile(label: "RPM", value: cadenceTxt, valueSize: 26, padding: 14)
                 MetricTile(label: "km/h", value: speedTxt, valueSize: 26, padding: 14)
             }
+            if let route = model.route {
+                RouteCard(route: route, meters: model.routeMeters, padding: 14) { core.ride(nil) }
+                    .padding(.top, 8)
+            }
             if model.trainerControllable {
                 TrainerStepper(mode: model.trainerMode, padding: 14,
-                               onStep: { applyRidePress([$0]) }, onSet: core.setTrainer)
+                               onStep: { applyRidePress([$0]) }, onSet: core.setTrainer,
+                               hill: model.route == nil)
                     .padding(.top, 8)
             }
 
@@ -117,13 +125,18 @@ struct ContentView: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background(Color(red: 0.043, green: 0.043, blue: 0.059).ignoresSafeArea())
-        .sheet(isPresented: $showDevices) { 
-            SettingsSheet(ble: ble, model: model, recorder: recorder, setRider: core.setRider,
+        // Route opens once the sheet is gone: an error alert can't present over it.
+        .sheet(isPresented: $showDevices, onDismiss: { pendingRoute.map(core.open); pendingRoute = nil }) {
+            SettingsSheet(ble: ble, model: model, recorder: recorder, setRider: core.setRider, openRoute: { pendingRoute = $0 },
                           vibrateEvery: $vibrateEvery,
                           island: Binding(get: { activity != nil },
                                           set: { $0 ? startActivity() : endActivity() }))
         }
         .preferredColorScheme(.dark)
+        .alert("Route", isPresented: Binding(get: { model.routeError != nil },
+                                             set: { if !$0 { model.routeError = nil } })) {
+            Button("OK") {}
+        } message: { Text(model.routeError ?? "") }
         .onAppear {
             startActivity()
             UNUserNotificationCenter.current()
@@ -210,11 +223,14 @@ struct SettingsSheet: View {
     @ObservedObject var model: RideModel
     @ObservedObject var recorder: Recorder
     let setRider: (Rider) -> Void
+    let openRoute: (URL) -> Void
     @Binding var vibrateEvery: Int
     @Binding var island: Bool
     // ponytail: 1s tick re-reads ble.discovered (not observable); fine for a settings sheet
     @State private var tick = 0
     @State private var scanAll = false
+    @State private var pickRoute = false
+    @Environment(\.dismiss) private var dismiss
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -261,6 +277,11 @@ struct SettingsSheet: View {
                         ForEach(Rider.difficulties, id: \.self) { Text("\($0) %").tag($0) }
                     }
                 }
+                Section(footer: Text("Rides a GPX track's hills in sim, at your road speed. Gears stay yours.")) {
+                    Button { pickRoute = true } label: {
+                        Label("Ride a GPX Route…", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    }
+                }
                 Section(header: Text("Heart-rate alert"),
                         footer: Text("Vibrates while you're over the limit; a notification when Orbeat is in the background.")) {
                     HStack {
@@ -297,6 +318,11 @@ struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Settings")
+            .fileImporter(isPresented: $pickRoute, allowedContentTypes: [UTType(filenameExtension: "gpx") ?? .xml]) {
+                guard case .success(let url) = $0 else { return }
+                openRoute(url)
+                dismiss()
+            }
             .onReceive(timer) { _ in tick += 1 }
             .onDisappear { ble?.setScanAll(false) }
         }

@@ -44,6 +44,9 @@ targets:
         CFBundleDisplayName: Orbeat
         CFBundleIconFile: Orbeat
         LSUIElement: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.vibecode.orbeat.ride
+            CFBundleURLSchemes: [orbeat]
         NSBluetoothAlwaysUsageDescription: Orbeat reads live heart rate and power from nearby Bluetooth sensors and talks to Orbeat on your iPhone.
     entitlements:
       path: Mac/Orbeat.entitlements
@@ -85,6 +88,20 @@ targets:
         UIBackgroundModes: [bluetooth-central, bluetooth-peripheral, remote-notification]
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.vibecode.orbeat.ride
+            CFBundleURLSchemes: [orbeat]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: GPX route
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.topografix.gpx]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.topografix.gpx
+            UTTypeDescription: GPX route
+            UTTypeConformsTo: [public.xml]
+            UTTypeTagSpecification:
+              public.filename-extension: [gpx]
+              public.mime-type: [application/gpx+xml]
     entitlements:
       path: ios/App/Orbeat.entitlements
       properties:

@@ -4,7 +4,9 @@ import CoreBluetooth
 /// Pure decode + rising-edge detection: no transport. Feed every notification
 /// to `handle`.
 final class ZwiftRideController {
-    static let service   = CBUUID(string: "00000001-19CA-4651-86E5-FA29DCDD09D1")
+    /// Original Zwift service, and the SIG-assigned FC82 newer firmware uses
+    /// (KICKR CORE since ~Sep 2026, logged); same characteristics in both.
+    static let services  = [CBUUID(string: "00000001-19CA-4651-86E5-FA29DCDD09D1"), CBUUID(string: "FC82")]
     static let async     = CBUUID(string: "00000002-19CA-4651-86E5-FA29DCDD09D1")  // notify
     static let syncRx    = CBUUID(string: "00000003-19CA-4651-86E5-FA29DCDD09D1")  // write (RideOn)
     static let syncTx    = CBUUID(string: "00000004-19CA-4651-86E5-FA29DCDD09D1")  // notify
