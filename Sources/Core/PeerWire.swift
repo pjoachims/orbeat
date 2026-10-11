@@ -60,6 +60,8 @@ enum PeerCommand: Equatable {
     case setTrainer(TrainerMode)
     /// Rider settings changed on the device that doesn't own the trainer.
     case setRider(Rider)
+    /// New terrain grade (route mode); the owner keeps its own gear.
+    case setGrade(Int)
     /// Stop the session the receiver is recording (sessions record where started).
     case stopSession
     /// Pause (true) or resume (false) the receiver's session.
@@ -79,6 +81,7 @@ enum PeerWire {
         var step: Int?          // +1 up, -1 down
         var set: TrainerMode?
         var rider: Rider?
+        var grade: Int?
         var stop: Bool?
         var pause: Bool?
     }
@@ -90,6 +93,7 @@ enum PeerWire {
         case .command(.step(let i)): e.step = i == .shiftUp ? 1 : -1
         case .command(.setTrainer(let t)): e.set = t
         case .command(.setRider(let r)): e.rider = r
+        case .command(.setGrade(let g)): e.grade = g
         case .command(.stopSession): e.stop = true
         case .command(.pauseSession(let p)): e.pause = p
         }
@@ -102,6 +106,7 @@ enum PeerWire {
         if let s = e.step { return .command(.step(s > 0 ? .shiftUp : .shiftDown)) }
         if let t = e.set { return .command(.setTrainer(t)) }
         if let r = e.rider { return .command(.setRider(r)) }
+        if let g = e.grade { return .command(.setGrade(g)) }
         if e.stop == true { return .command(.stopSession) }
         if let p = e.pause { return .command(.pauseSession(p)) }
         return nil

@@ -39,7 +39,9 @@ extension RideModel {
         case .handlebar:
             break   // routed by AppCore: the trainer may live on the peer
         case .trainerReady:
-            localTrainer = true
+            trainerAttached = true
+            updateOwner()
+            guard localTrainer else { return }   // the peer drives it; we mirror
             trainerControllable = true
             // The peer may already ride this trainer: keep its target. Else
             // start in sim at the persisted grade (never resists hard on
@@ -54,10 +56,12 @@ extension RideModel {
                 trainerMode = ble?.setTrainerMode(.sim(grade: grade, gear: gear), rider: rider)
             }
         case .trainerLost:
+            trainerAttached = false
             localTrainer = false
             trainerControllable = peer?.trainer != nil
             trainerMode = peer?.trainer
         case .trainerMode(let m):
+            guard localTrainer else { return }   // mirroring the peer: its state is the truth
             // Trainer is the source of truth for ERG/resistance: follows changes
             // made by any other client on the same trainer. A sim frame only
             // carries the grade the trainer got — terrain, difficulty and gear
@@ -76,6 +80,7 @@ extension RideModel {
     /// Peer state arrived (nil = link dropped).
     func apply(peer s: PeerState?) {
         peer = s
+        updateOwner()
         let now = Date()
         let label = PeerLink.peerLabel
         if let b = s?.bpm, now.timeIntervalSince(directBPMAt) > Self.directWindow {
@@ -99,6 +104,24 @@ extension RideModel {
             remember(t)
         }
     }
+
+    /// Who drives the trainer. Attached here alone: us. iPhone and Mac both on
+    /// it: the iPhone (it's on the bike), and the Mac mirrors it like any
+    /// non-owner — two drivers would each keep their own gear and grade.
+    /// Re-evaluated on attach and on every peer state; the Mac takes over
+    /// when the phone stops driving (AppCore re-sends the last target).
+    func updateOwner() {
+        let own = trainerAttached && !(Self.yieldsSharedTrainer && peer?.trainer != nil)
+        guard own != localTrainer else { return }
+        localTrainer = own
+        trainerControllable = own || peer?.trainer != nil
+        if !own { trainerMode = peer?.trainer }
+    }
+    #if os(macOS)
+    static let yieldsSharedTrainer = true
+    #else
+    static let yieldsSharedTrainer = false
+    #endif
 
     /// What this device publishes to its peer: direct readings only.
     func directState(recording: SessionClock?) -> PeerState {
@@ -146,6 +169,7 @@ extension RideModel {
         // Road-model speed, not the trainer's wheel speed (bogus in ERG).
         if case .sim(let g, _) = trainerMode { speedKmh = RoadSpeed.kmh(watts: w, gradePercent: Double(g) / 100, massKg: rider.massKg) }
         else { speedKmh = RoadSpeed.kmh(watts: w, massKg: rider.massKg) }
+        powerAt = Date()
         touch()   // power packets count as a sync too
     }
 }

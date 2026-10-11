@@ -58,6 +58,18 @@ final class RideModel: ObservableObject {
         .flatMap { try? JSONDecoder().decode(Rider.self, from: $0) } ?? Rider() {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(rider), forKey: "rider") }
     }
+    /// Route being ridden: sim follows its grade (AppCore). Persisted with the
+    /// distance along it, so a relaunch resumes mid-ride.
+    // ponytail: whole route as JSON in UserDefaults (~100 KB for a long ride); a file if it grows
+    @Published var route: Route? = UserDefaults.standard.data(forKey: "route")
+        .flatMap { try? JSONDecoder().decode(Route.self, from: $0) } {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(route), forKey: "route") }
+    }
+    /// Why the last route couldn't be opened; the UI shows it once and clears it.
+    @Published var routeError: String?
+    @Published var routeMeters: Double = UserDefaults.standard.double(forKey: "routeMeters") {
+        didSet { UserDefaults.standard.set(routeMeters, forKey: "routeMeters") }
+    }
     /// True once a controllable trainer (FTMS control point) is connected.
     @Published var trainerControllable = false
     /// Current trainer control target (ERG watts / resistance / sim grade);
@@ -77,8 +89,11 @@ final class RideModel: ObservableObject {
     @Published var peerConnected = false
     /// Latest state from the peer: its directly connected sensors, trainer, session.
     @Published var peer: PeerState?
-    /// A trainer is attached to THIS device (vs. controlled through the peer).
+    /// THIS device drives the trainer (vs. controlling it through the peer).
     @Published var localTrainer = false
+    /// The trainer is connected to this device — it may still be the peer's
+    /// to drive (see updateOwner).
+    var trainerAttached = false
     /// Bumped per trainer attach, so a stale connect fallback can't fire.
     var trainerAttach = 0
     /// Readings from sensors connected to THIS device — what the peer link
@@ -88,6 +103,8 @@ final class RideModel: ObservableObject {
     var directHRSource = ""
     var directPower: PowerReading?
     var directPowerAt = Date.distantPast
+    /// Last power reading from anywhere: route mode only advances while it is fresh.
+    var powerAt = Date.distantPast
     var directPowerSource = ""
     static let directWindow: TimeInterval = 5
 

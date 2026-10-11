@@ -16,6 +16,7 @@ enum PeerWireTests {
             .command(.setTrainer(.sim(grade: -500))),
             .command(.setTrainer(.sim(grade: 800, gear: 3))),
             .command(.setRider(Rider(riderKg: 80, bikeKg: 8, difficulty: 75))),
+            .command(.setGrade(-250)),
             .command(.stopSession),
             .command(.pauseSession(true)),
             .command(.pauseSession(false)),

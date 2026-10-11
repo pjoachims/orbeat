@@ -13,6 +13,8 @@ final class AppCore: ObservableObject {
     private var timer: AnyCancellable?
     private var settings: AnyCancellable?
     private var lastPush = Date.distantPast
+    private var routeAt: Date?
+    private var lastGradeAt = Date.distantPast
 
     init() {
         #if targetEnvironment(simulator)
@@ -32,7 +34,7 @@ final class AppCore: ObservableObject {
             guard let self else { return }
             recorder.log(["src": "peer", "ev": up ? "linkUp" : "linkDown"])
             model.peerConnected = up
-            if up { pushState(force: true) } else { model.apply(peer: nil) }
+            if up { pushState(force: true) } else { applyPeer(nil) }
         }
         self.peer = peer
         #endif
@@ -62,6 +64,58 @@ final class AppCore: ObservableObject {
         model.rider = r
         if model.localTrainer, case .sim? = model.trainerMode { setTrainer(model.trainerMode!) }
         else if model.peer?.trainer != nil { peer?.send(.command(.setRider(r))) }
+    }
+
+    /// Terrain grade for sim, keeping the gear where the trainer is. No-op
+    /// outside sim: a route never switches the trainer out of ERG.
+    func setGrade(_ g: Int) {
+        if model.localTrainer, case .sim(_, let gear)? = model.trainerMode {
+            setTrainer(.sim(grade: g, gear: gear).clamped)
+        } else if !model.localTrainer, model.peer?.trainer != nil { peer?.send(.command(.setGrade(g))) }
+    }
+
+    /// Start riding a route from its beginning (nil = stop). Switches the
+    /// trainer to sim: the route only drives sim.
+    func ride(_ r: Route?) {
+        model.route = r
+        model.routeMeters = 0
+        routeAt = nil
+        lastGradeAt = .distantPast
+        if r == nil { setGrade(0) }   // stopped: flat, like finishing
+        else if model.trainerControllable, !TrainerMode.sim(grade: 0).sameKind(as: model.trainerMode) {
+            setTrainer(.sim(grade: 0))
+        }
+    }
+
+    /// A GPX file (Files, share sheet, Open panel) or orbeat://ride?gpx=<https URL>.
+    func open(_ url: URL) {
+        if url.isFileURL {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            load(try? Data(contentsOf: url), from: url)
+        } else if url.scheme == "orbeat", url.host == "ride",
+                  let s = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                      .queryItems?.first(where: { $0.name == "gpx" })?.value,
+                  let remote = URL(string: s), remote.scheme == "https" {
+            URLSession.shared.dataTask(with: remote) { [weak self] data, response, _ in
+                let ok = (response as? HTTPURLResponse)?.statusCode == 200 && (data?.count ?? 0) <= 20_000_000
+                DispatchQueue.main.async { self?.load(ok ? data : nil, from: remote) }
+            }.resume()
+        } else {
+            model.routeError = "Orbeat can't open \(url.absoluteString)."
+        }
+    }
+
+    private func load(_ data: Data?, from url: URL) {
+        let name = url.deletingPathExtension().lastPathComponent
+        guard let r = data.flatMap({ Route.gpx($0, name: name) }) else {
+            recorder.log(["src": "route", "ev": "rejected", "url": url.absoluteString, "bytes": data?.count ?? -1])
+            model.routeError = data == nil ? "Couldn't download or read \(url.lastPathComponent)."
+                                           : "\(url.lastPathComponent) has no elevation to ride."
+            return
+        }
+        recorder.log(["src": "route", "ev": "loaded", "name": r.name, "km": r.length / 1000, "points": r.dist.count])
+        ride(r)
     }
 
     /// Clock of the session running here or on the peer.
@@ -117,7 +171,7 @@ final class AppCore: ObservableObject {
     private func handle(_ message: PeerMessage) {
         switch message {
         case .state(let s):
-            model.apply(peer: s)
+            applyPeer(s)
             store.tick(model)
         case .command(.step(let i)):
             if model.localTrainer { step(i) }
@@ -125,6 +179,8 @@ final class AppCore: ObservableObject {
             if model.localTrainer { setTrainer(m) }
         case .command(.setRider(let r)):
             setRider(r)
+        case .command(.setGrade(let g)):
+            if model.localTrainer, model.route == nil { setGrade(g) }   // own route wins: no flapping
         case .command(.stopSession):
             if store.active != nil { stopSession() }
         case .command(.pauseSession(let p)):
@@ -132,9 +188,35 @@ final class AppCore: ObservableObject {
         }
     }
 
+    /// Peer state in; if that hands us the trainer, hold its last target.
+    private func applyPeer(_ s: PeerState?) {
+        let drove = model.localTrainer
+        model.apply(peer: s)
+        if !drove, model.localTrainer, let m = model.trainerMode { setTrainer(m) }
+    }
+
     private func tick() {
         store.tick(model)
+        followRoute()
         pushState()
+    }
+
+    /// Route mode, on the device that loaded the route (the trainer may be on
+    /// the peer): advance at road-model speed, send the grade when it changes
+    /// by ≥ 0.1 %, at most once a second. Paused outside sim and while no
+    /// fresh power arrives. Flat once finished.
+    private func followRoute() {
+        guard let route = model.route, case .sim(let g, _)? = model.trainerMode else { routeAt = nil; return }
+        let now = Date()
+        if let t = routeAt, let v = model.speedKmh, now.timeIntervalSince(model.powerAt) < RideModel.directWindow {
+            model.routeMeters = min(route.length, model.routeMeters + v / 3.6 * min(now.timeIntervalSince(t), 5))
+        }
+        routeAt = now
+        let target = model.routeMeters < route.length ? route.grade(at: model.routeMeters) : 0
+        if abs(target - g) >= 10, now.timeIntervalSince(lastGradeAt) >= 1 {
+            lastGradeAt = now
+            setGrade(target)
+        }
     }
 
     private func pushState(force: Bool = false) {

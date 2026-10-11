@@ -191,6 +191,8 @@ struct TrainerStepper: View {
     var padding: CGFloat = 12
     let onStep: (HandlebarInput) -> Void
     var onSet: ((TrainerMode) -> Void)? = nil
+    /// Hill stepper in sim; hidden while a route sets the grade.
+    var hill = true
 
     /// Kind markers only: the trainer owner resumes each kind's last target.
     private static let kinds: [(String, TrainerMode)] =
@@ -210,7 +212,7 @@ struct TrainerStepper: View {
                 stepButton("minus") { onStep(.shiftDown) }
                 stepButton("plus") { onStep(.shiftUp) }
             }
-            if case .sim(let g, let gear)? = mode, let onSet {
+            if hill, case .sim(let g, let gear)? = mode, let onSet {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
                         Eyebrow(text: "Hill · ±0.5 %")

@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var warningPanel: NSPanel?
     var sessionsWindow: NSWindow?
     private var bpmObserver: AnyObject?
+    private var routeErrorObserver: AnyObject?
 
     func applicationDidFinishLaunching(_ note: Notification) {
         core = AppCore()
@@ -41,7 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         let host = NSHostingController(rootView: VStack(spacing: 0) {
             HeartCard(model: model, compact: true,
-                      onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer)
+                      onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer,
+                      onStopRoute: { [weak self] in self?.core.ride(nil) })
             SessionBar(core: core, store: core.store, model: model, compact: true)
                 .padding([.horizontal, .bottom], 16)
         }
@@ -57,9 +59,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async { self?.updateStatusTitle() }
             } as AnyObject
 
+        routeErrorObserver = model.$routeError.compactMap { $0 }.receive(on: DispatchQueue.main)
+            .sink { [weak self] message in
+                self?.model.routeError = nil
+                let alert = NSAlert()
+                alert.messageText = "Route"
+                alert.informativeText = message
+                NSApp.activate()
+                alert.runModal()
+            } as AnyObject
+
         if CommandLine.arguments.contains("--float") { toggleFloating() }
         if CommandLine.arguments.contains("--sessions") { showSessions() }
     }
 
     func applyRidePress(_ inputs: [HandlebarInput]) { inputs.forEach(core.step) }
+
+    /// orbeat://ride?gpx=<https URL>.
+    func application(_ application: NSApplication, open urls: [URL]) { urls.forEach(core.open) }
 }
