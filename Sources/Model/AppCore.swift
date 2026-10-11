@@ -55,6 +55,15 @@ final class AppCore: ObservableObject {
         else if model.peer?.trainer != nil { peer?.send(.command(.setTrainer(mode))) }
     }
 
+    /// New rider settings: kept here, and applied where the trainer is — the
+    /// owner re-sends the sim target so the trainer feels it now.
+    func setRider(_ r: Rider) {
+        let r = r.clamped
+        model.rider = r
+        if model.localTrainer, case .sim? = model.trainerMode { setTrainer(model.trainerMode!) }
+        else if model.peer?.trainer != nil { peer?.send(.command(.setRider(r))) }
+    }
+
     /// Clock of the session running here or on the peer.
     var recording: SessionClock? { store.clock ?? model.peer?.recording }
 
@@ -114,6 +123,8 @@ final class AppCore: ObservableObject {
             if model.localTrainer { step(i) }
         case .command(.setTrainer(let m)):
             if model.localTrainer { setTrainer(m) }
+        case .command(.setRider(let r)):
+            setRider(r)
         case .command(.stopSession):
             if store.active != nil { stopSession() }
         case .command(.pauseSession(let p)):
@@ -138,16 +149,14 @@ final class AppCore: ObservableObject {
         model.setLive(true, source: "Simulated ride")
         model.localTrainer = true
         model.trainerControllable = true
-        model.trainerMode = .sim(grade: model.grade)
+        model.trainerMode = .sim(grade: model.grade, gear: model.gear)
         var bpm = 128.0, watts = 210.0
         Task { @MainActor [model] in
             while true {
                 bpm = min(174, max(96, bpm + .random(in: -4...5)))
                 watts = min(340, max(140, watts + .random(in: -14...14)))
                 model.ingest(Int(bpm))
-                model.watts = Int(watts)
-                model.cadence = Int.random(in: 84...96)
-                model.speedKmh = watts / 6.4
+                model.showPower(Int(watts), Int.random(in: 84...96))   // same road model as a real trainer
                 try? await Task.sleep(for: .seconds(1.1))
             }
         }

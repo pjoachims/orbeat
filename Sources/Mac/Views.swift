@@ -41,6 +41,14 @@ struct HeartCard: View {
                 PeerBadge(model: model)
                 LiveDot(live: model.isFresh)
             }
+            HStack {
+                Text(model.sourceName).lineLimit(1)
+                Spacer()
+                Text(model.hasData ? model.syncLabel : model.bleStatus).lineLimit(1)
+            }
+            .font(.system(size: compact ? 10.5 : 11))
+            .foregroundStyle(.tertiary)
+            .padding(.top, 2)
             .padding(.bottom, compact ? 8 : 12)
 
             // big number
@@ -100,20 +108,6 @@ struct HeartCard: View {
                 }
                 .padding(.top, compact ? 10 : 12)
             }
-
-            // footer
-            HStack {
-                Text(model.sourceName)
-                    .font(.system(size: compact ? 10.5 : 11))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                Spacer()
-                Text(model.hasData ? model.syncLabel : model.bleStatus)
-                    .font(.system(size: compact ? 10.5 : 11))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
-            .padding(.top, compact ? 10 : 14)
         }
         .padding(compact ? 16 : 22)
         .frame(width: compact ? 272 : 312)

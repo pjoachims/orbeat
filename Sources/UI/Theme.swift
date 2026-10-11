@@ -184,8 +184,8 @@ struct MetricTile: View {
     }
 }
 
-/// Current trainer target with − / + steppers (same policy as the paddles)
-/// and a Sim / ERG switch.
+/// Current trainer target with − / + steppers (same policy as the paddles),
+/// a hill stepper in sim (the paddles shift gears there), and a Sim / ERG switch.
 struct TrainerStepper: View {
     let mode: TrainerMode?
     var padding: CGFloat = 12
@@ -201,7 +201,7 @@ struct TrainerStepper: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     Eyebrow(text: "Trainer · ±\(mode?.stepLabel.dropFirst() ?? "")")
-                    Text(mode?.label ?? "Ready")
+                    Text(mode.map { if case .sim(_, let gear) = $0 { "Gear \(gear)" } else { $0.label } } ?? "Ready")
                         .font(.system(size: 15, weight: .semibold))
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -209,6 +209,20 @@ struct TrainerStepper: View {
                 Spacer(minLength: 4)
                 stepButton("minus") { onStep(.shiftDown) }
                 stepButton("plus") { onStep(.shiftUp) }
+            }
+            if case .sim(let g, let gear)? = mode, let onSet {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Eyebrow(text: "Hill · ±0.5 %")
+                        Text(String(format: "%.1f %%", Double(g) / 100))
+                            .font(.system(size: 15, weight: .semibold))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                    }
+                    Spacer(minLength: 4)
+                    stepButton("minus") { onSet(TrainerMode.sim(grade: g - 50, gear: gear).clamped) }
+                    stepButton("plus") { onSet(TrainerMode.sim(grade: g + 50, gear: gear).clamped) }
+                }
             }
             if let onSet {
                 Picker("Mode", selection: Binding(

@@ -52,6 +52,14 @@ struct ContentView: View {
                 Spacer()
                 PeerBadge(model: model)
                 LiveDot(live: model.isFresh)
+                Button { showDevices = true } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Settings")
             }
             Text(model.hasData ? model.sourceName : model.bleStatus)
                 .font(.footnote)
@@ -104,66 +112,17 @@ struct ContentView: View {
 
             SessionBar(core: core, store: store, model: model)
                 .padding(.top, 8)
-
-            Spacer(minLength: 16)
-
-            // alert
-            HStack(spacing: 10) {
-                Text("Alert at").foregroundStyle(.secondary)
-                TextField("off", value: Binding(
-                    get: { model.threshold == 0 ? nil : model.threshold },
-                    set: { model.threshold = $0 ?? 0 }
-                ), format: .number)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.center)
-                    .monospacedDigit()
-                    .frame(width: 56)
-                    .padding(.vertical, 7)
-                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.primary.opacity(0.08)))
-                Text("bpm").foregroundStyle(.secondary)
-                Spacer()
-                Picker("Vibrate", selection: $vibrateEvery) {
-                    Text("No buzz").tag(0)
-                    ForEach([5, 10, 30, 60], id: \.self) { Text("Buzz \($0)s").tag($0) }
-                }
-                .tint(.secondary)
-                .fixedSize()
-            }
-            .font(.subheadline)
-            .padding(.bottom, 6)
-
-            // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
-            HStack(spacing: 10) {
-                Toggle(isOn: $recorder.recording) {
-                    Label("Log ride", systemImage: "record.circle")
-                        .foregroundStyle(recorder.recording ? orbeatRed : .secondary)
-                }
-                .toggleStyle(.button)
-                .buttonStyle(.plain)
-                Spacer()
-                ShareLink(item: Recorder.logURL) {
-                    Label("orbeat.jsonl", systemImage: "square.and.arrow.up")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .font(.subheadline)
-            .padding(.bottom, 10)
-
-            HStack(spacing: 8) {
-                action(activity == nil ? "Dynamic Island" : "Hide Island",
-                       activity == nil ? "circle.dashed" : "circle.dashed.inset.filled") {
-                    activity == nil ? startActivity() : endActivity()
-                }
-                action("Equipment", "antenna.radiowaves.left.and.right") { showDevices = true }
-            }
         }
         .padding(.horizontal, 22)
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background(Color(red: 0.043, green: 0.043, blue: 0.059).ignoresSafeArea())
-        .sheet(isPresented: $showDevices) { DeviceSheet(ble: ble, model: model) }
+        .sheet(isPresented: $showDevices) { 
+            SettingsSheet(ble: ble, model: model, recorder: recorder, setRider: core.setRider,
+                          vibrateEvery: $vibrateEvery,
+                          island: Binding(get: { activity != nil },
+                                          set: { $0 ? startActivity() : endActivity() }))
+        }
         .preferredColorScheme(.dark)
         .onAppear {
             startActivity()
@@ -192,18 +151,6 @@ struct ContentView: View {
     private var wattsTxt: String { model.displayWatts.map { "\($0)" } ?? "––" }
     private var cadenceTxt: String { model.displayCadence.map { "\($0)" } ?? "––" }
     private var speedTxt: String { model.displaySpeedKmh.map { String(format: "%.1f", $0) } ?? "––" }
-
-    private func action(_ title: String, _ symbol: String, _ run: @escaping () -> Void) -> some View {
-        Button(action: run) {
-            Label(title, systemImage: symbol)
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.primary.opacity(0.08)))
-        }
-        .buttonStyle(.plain)
-    }
 
     private func startActivity() {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
@@ -256,10 +203,15 @@ struct ContentView: View {
     private func applyRidePress(_ inputs: [HandlebarInput]) { inputs.forEach(core.step) }
 }
 
-/// Discovered-sensor list — the iOS stand-in for the macOS "Connect Equipment" menu.
-struct DeviceSheet: View {
+/// Everything set once per ride or less: equipment (the iOS stand-in for the
+/// macOS "Connect Equipment" menu), rider, alert, Live Activity, debug log.
+struct SettingsSheet: View {
     let ble: BLEManager?
     @ObservedObject var model: RideModel
+    @ObservedObject var recorder: Recorder
+    let setRider: (Rider) -> Void
+    @Binding var vibrateEvery: Int
+    @Binding var island: Bool
     // ponytail: 1s tick re-reads ble.discovered (not observable); fine for a settings sheet
     @State private var tick = 0
     @State private var scanAll = false
@@ -275,7 +227,7 @@ struct DeviceSheet: View {
                             get: { ble.proxy.enabled },
                             set: { ble.proxy.enabled = $0; tick += 1 }))
                     }
-                    Section(footer: Text(model.bleStatus)) {
+                    Section(header: Text("Equipment"), footer: Text(model.bleStatus)) {
                         if ble.discovered.isEmpty {
                             Label("Scanning for heart-rate straps and power meters…",
                                   systemImage: "antenna.radiowaves.left.and.right")
@@ -284,6 +236,9 @@ struct DeviceSheet: View {
                         ForEach(ble.discovered.filter(\.isSensor), id: \.peripheral.identifier) { d in
                             row(ble, d)
                         }
+                        Toggle("Show all nearby devices", isOn: Binding(
+                            get: { scanAll },
+                            set: { scanAll = $0; ble.setScanAll($0) }))
                     }
                     if scanAll {
                         Section("All nearby devices") {
@@ -297,23 +252,59 @@ struct DeviceSheet: View {
                             }
                         }
                     }
-                } else {
+                }
+                Section(header: Text("Rider"),
+                        footer: Text("Sent to the trainer for sim and virtual gears, like Zwift. Trainer Difficulty scales climbs; descents are halved first.")) {
+                    Stepper("Rider \(model.rider.riderKg) kg", value: riderBinding(\.riderKg), in: Rider.riderRange)
+                    Stepper("Bike \(model.rider.bikeKg) kg", value: riderBinding(\.bikeKg), in: Rider.bikeRange)
+                    Picker("Trainer Difficulty", selection: riderBinding(\.difficulty)) {
+                        ForEach(Rider.difficulties, id: \.self) { Text("\($0) %").tag($0) }
+                    }
+                }
+                Section(header: Text("Heart-rate alert"),
+                        footer: Text("Vibrates while you're over the limit; a notification when Orbeat is in the background.")) {
+                    HStack {
+                        Text("Alert at")
+                        Spacer()
+                        TextField("off", value: Binding(
+                            get: { model.threshold == 0 ? nil : model.threshold },
+                            set: { model.threshold = $0 ?? 0 }
+                        ), format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .monospacedDigit()
+                            .frame(width: 60)
+                        Text("bpm").foregroundStyle(.secondary)
+                    }
+                    Picker("Vibrate", selection: $vibrateEvery) {
+                        Text("Off").tag(0)
+                        ForEach([5, 10, 30, 60], id: \.self) { Text("Every \($0) s").tag($0) }
+                    }
+                }
+                Section {
+                    Toggle("Dynamic Island", isOn: $island)
+                }
+                // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
+                Section(header: Text("Debug")) {
+                    Toggle("Log ride", isOn: $recorder.recording)
+                    ShareLink(item: Recorder.logURL) {
+                        Label("Share orbeat.jsonl", systemImage: "square.and.arrow.up")
+                    }
+                }
+                if ble == nil {
                     Text("No Bluetooth on the simulator — run on a real iPhone.")
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Connect Equipment")
-            .toolbar {
-                Button {
-                    scanAll.toggle()
-                    ble?.setScanAll(scanAll)
-                } label: {
-                    Image(systemName: scanAll ? "xmark.circle" : "plus")
-                }
-            }
+            .navigationTitle("Settings")
             .onReceive(timer) { _ in tick += 1 }
             .onDisappear { ble?.setScanAll(false) }
         }
+    }
+
+    private func riderBinding(_ key: WritableKeyPath<Rider, Int>) -> Binding<Int> {
+        Binding(get: { model.rider[keyPath: key] },
+                set: { var r = model.rider; r[keyPath: key] = $0; setRider(r) })
     }
 
     private func row(_ ble: BLEManager, _ d: BLEManager.Device) -> some View {

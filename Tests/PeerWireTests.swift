@@ -5,7 +5,8 @@ enum PeerWireTests {
         let full = PeerState(bpm: 187, hrSource: "Polar H10 A1B2C3D4", watts: 1234, cadence: 110,
                              kmh: 45.123456789, powerSource: "KICKR CORE 5A3F",
                              trainer: .resistance(percent: 100),
-                             recordingSince: Date(timeIntervalSince1970: 1_790_000_000.123))
+                             recordingSince: Date(timeIntervalSince1970: 1_790_000_000.123),
+                             rider: Rider(riderKg: 150, bikeKg: 25, difficulty: 100))
         let messages: [PeerMessage] = [
             .state(full),
             .state(PeerState()),
@@ -13,6 +14,8 @@ enum PeerWireTests {
             .command(.step(.shiftDown)),
             .command(.setTrainer(.erg(targetWatts: 250))),
             .command(.setTrainer(.sim(grade: -500))),
+            .command(.setTrainer(.sim(grade: 800, gear: 3))),
+            .command(.setRider(Rider(riderKg: 80, bikeKg: 8, difficulty: 75))),
             .command(.stopSession),
             .command(.pauseSession(true)),
             .command(.pauseSession(false)),

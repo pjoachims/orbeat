@@ -27,22 +27,28 @@ extension AppDelegate {
         let sessionsItem = NSMenuItem(title: "Sessions…", action: #selector(showSessions), keyEquivalent: "s")
         sessionsItem.target = self
         menu.addItem(sessionsItem)
-        menu.addEquipmentSubmenu(from: ble, target: self)
         if model.trainerControllable {
+            menu.addItem(.separator())
             let mode = model.trainerMode
             let target = NSMenuItem(title: "Trainer — \(mode?.label ?? "ready")",
                                     action: nil, keyEquivalent: "")
             target.isEnabled = false
             menu.addItem(target)
-            let harder = NSMenuItem(title: "Harder (\(mode?.stepLabel ?? "+0.5 %"))",
+            let harder = NSMenuItem(title: "Harder (\(mode?.stepLabel ?? "+1 gear"))",
                                     action: #selector(harder), keyEquivalent: "")
             harder.target = self
             menu.addItem(harder)
-            let easier = NSMenuItem(title: "Easier (\((mode?.stepLabel ?? "+0.5 %").replacingOccurrences(of: "+", with: "−"))",
+            let easier = NSMenuItem(title: "Easier (\((mode?.stepLabel ?? "+1 gear").replacingOccurrences(of: "+", with: "−"))",
                                     action: #selector(easier), keyEquivalent: "")
             easier.target = self
             menu.addItem(easier)
         }
+        menu.addItem(.separator())
+        menu.addEquipmentSubmenu(from: ble, target: self)
+        menu.addRiderSubmenu(model: model, target: self)
+        menu.addThresholdSubmenu(model: model, target: self)
+        menu.addBarMetricsSubmenu(model: model, target: self)
+        menu.addItem(.separator())
         let shareItem = NSMenuItem(title: "Share Sensors via Bluetooth",
                                    action: #selector(toggleRebroadcast), keyEquivalent: "")
         shareItem.target = self
@@ -53,7 +59,7 @@ extension AppDelegate {
         cloudItem.target = self
         cloudItem.state = SessionStore.cloudSync ? .on : .off
         menu.addItem(cloudItem)
-        let logItem = NSMenuItem(title: "Log to DuckDB (JSONL)",
+        let logItem = NSMenuItem(title: "Log Ride (JSONL)",
                                  action: #selector(toggleDuckDBLog), keyEquivalent: "")
         logItem.target = self
         logItem.state = recorder.recording ? .on : .off
@@ -64,8 +70,6 @@ extension AppDelegate {
             reveal.target = self
             menu.addItem(reveal)
         }
-        menu.addBarMetricsSubmenu(model: model, target: self)
-        menu.addThresholdSubmenu(model: model, target: self)
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Orbeat", action: #selector(NSApp.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
@@ -79,6 +83,11 @@ extension AppDelegate {
         if model.barMetrics.contains(key) { model.barMetrics.remove(key) }
         else { model.barMetrics.insert(key) }
         updateStatusTitle()
+    }
+
+    @objc func setRider(_ sender: NSMenuItem) {
+        guard let r = sender.representedObject as? Rider else { return }
+        core.setRider(r)
     }
 
     @objc func toggleRebroadcast() {
@@ -193,6 +202,35 @@ private extension NSMenu {
         }
         barItem.submenu = sub
         addItem(barItem)
+    }
+
+    /// Rider/bike weight and Trainer Difficulty for sim (sent to the trainer).
+    func addRiderSubmenu(model: RideModel, target: AppDelegate) {
+        let r = model.rider
+        let riderItem = NSMenuItem(title: "Rider (\(r.riderKg) + \(r.bikeKg) kg · Difficulty \(r.difficulty) %)",
+                                   action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        func section(_ title: String, _ values: [Int], _ unit: String, _ make: (Int) -> Rider, _ current: Int) {
+            let header = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            sub.addItem(header)
+            for v in values {
+                let item = NSMenuItem(title: "\(v) \(unit)", action: #selector(AppDelegate.setRider(_:)), keyEquivalent: "")
+                item.target = target
+                item.representedObject = make(v)
+                item.state = v == current ? .on : .off
+                sub.addItem(item)
+            }
+        }
+        // ponytail: preset lists; a custom entry if weights fall between them
+        section("Rider Weight", Array(stride(from: 50, through: 120, by: 5)) + (r.riderKg % 5 == 0 ? [] : [r.riderKg]),
+                "kg", { var n = r; n.riderKg = $0; return n }, r.riderKg)
+        sub.addItem(.separator())
+        section("Bike Weight", Array(6...15), "kg", { var n = r; n.bikeKg = $0; return n }, r.bikeKg)
+        sub.addItem(.separator())
+        section("Trainer Difficulty", Rider.difficulties, "%", { var n = r; n.difficulty = $0; return n }, r.difficulty)
+        riderItem.submenu = sub
+        addItem(riderItem)
     }
 
     func addThresholdSubmenu(model: RideModel, target: AppDelegate) {

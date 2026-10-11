@@ -16,10 +16,12 @@ struct PeerState: Codable, Equatable {
     /// while running, or the frozen elapsed seconds while paused.
     var recordingSince: Date?
     var recordingPaused: TimeInterval?
+    /// Rider settings of the trainer owner, so the other side shows and edits them.
+    var rider: Rider?
 
     enum CodingKeys: String, CodingKey {
         case bpm = "b", hrSource = "hs", watts = "w", cadence = "c", kmh = "k",
-             powerSource = "ps", trainer = "t", recordingSince = "r", recordingPaused = "rp"
+             powerSource = "ps", trainer = "t", recordingSince = "r", recordingPaused = "rp", rider = "rd"
     }
 
     var recording: SessionClock? {
@@ -56,6 +58,8 @@ enum SessionClock: Equatable {
 enum PeerCommand: Equatable {
     case step(HandlebarInput)
     case setTrainer(TrainerMode)
+    /// Rider settings changed on the device that doesn't own the trainer.
+    case setRider(Rider)
     /// Stop the session the receiver is recording (sessions record where started).
     case stopSession
     /// Pause (true) or resume (false) the receiver's session.
@@ -74,6 +78,7 @@ enum PeerWire {
         var s: PeerState?
         var step: Int?          // +1 up, -1 down
         var set: TrainerMode?
+        var rider: Rider?
         var stop: Bool?
         var pause: Bool?
     }
@@ -84,6 +89,7 @@ enum PeerWire {
         case .state(let s): e.s = s
         case .command(.step(let i)): e.step = i == .shiftUp ? 1 : -1
         case .command(.setTrainer(let t)): e.set = t
+        case .command(.setRider(let r)): e.rider = r
         case .command(.stopSession): e.stop = true
         case .command(.pauseSession(let p)): e.pause = p
         }
@@ -95,6 +101,7 @@ enum PeerWire {
         if let s = e.s { return .state(s) }
         if let s = e.step { return .command(.step(s > 0 ? .shiftUp : .shiftDown)) }
         if let t = e.set { return .command(.setTrainer(t)) }
+        if let r = e.rider { return .command(.setRider(r)) }
         if e.stop == true { return .command(.stopSession) }
         if let p = e.pause { return .command(.pauseSession(p)) }
         return nil
@@ -112,15 +119,16 @@ enum PeerWire {
     }()
 }
 
-/// Compact wire form: {"erg":200} / {"res":40} / {"sim":150}.
+/// Compact wire form: {"erg":200} / {"res":40} / {"sim":150,"g":12}.
 extension TrainerMode: Codable {
-    private enum K: String, CodingKey { case erg, res, sim }
+    private enum K: String, CodingKey { case erg, res, sim, g }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: K.self)
         if let w = try c.decodeIfPresent(Int.self, forKey: .erg) { self = .erg(targetWatts: w) }
         else if let p = try c.decodeIfPresent(Int.self, forKey: .res) { self = .resistance(percent: p) }
-        else { self = .sim(grade: try c.decode(Int.self, forKey: .sim)) }
+        else { self = .sim(grade: try c.decode(Int.self, forKey: .sim),
+                           gear: try c.decodeIfPresent(Int.self, forKey: .g) ?? TrainerMode.neutralGear) }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -128,7 +136,7 @@ extension TrainerMode: Codable {
         switch self {
         case .erg(let w): try c.encode(w, forKey: .erg)
         case .resistance(let p): try c.encode(p, forKey: .res)
-        case .sim(let g): try c.encode(g, forKey: .sim)
+        case .sim(let g, let gear): try c.encode(g, forKey: .sim); try c.encode(gear, forKey: .g)
         }
     }
 }

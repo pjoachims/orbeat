@@ -28,12 +28,12 @@ extension FtmsMachineStatus {
     /// The status frame a trainer would notify for `mode` — synthesized by a
     /// bridge for its own control-point writes, because a KICKR notifies
     /// 0x2ADA to every central EXCEPT the one that wrote.
-    static func encode(_ m: TrainerMode) -> [UInt8] {
+    static func encode(_ m: TrainerMode, rider: Rider) -> [UInt8] {
         func le(_ v: Int) -> [UInt8] { let u = UInt16(bitPattern: Int16(v)); return [UInt8(u & 0xFF), UInt8(u >> 8)] }
         switch m {
         case .erg(let w): return [0x08] + le(w)
         case .resistance(let p): return [0x07] + le(p * 10)
-        case .sim(let g): return [0x12, 0, 0] + le(g) + [0, 0]
+        case .sim: return [0x12] + m.simParams(rider: rider)!.bytes
         }
     }
 }

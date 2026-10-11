@@ -295,6 +295,10 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
                 let type: CBCharacteristicWriteType =
                     ch.properties.contains(.write) ? .withResponse : .withoutResponse
                 peripheral.writeValue(ZwiftRideController.handshake, for: ch, type: type)
+                if peripheral === powerPeripheral {
+                    trainer.attachZwift(peripheral, rx: ch)   // a Zwift-Ready trainer: sim + gears go here
+                    log(["src": "ble", "ev": "zwiftTrainer", "name": peripheral.name ?? "?"])
+                }
             }
         }
         if service.uuid == ZwiftRideController.service {
@@ -330,11 +334,14 @@ final class BLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate
     /// Push a control target to the attached trainer. Returns the applied
     /// (clamped) mode so the caller can keep its state in sync.
     @discardableResult
-    func setTrainerMode(_ mode: TrainerMode) -> TrainerMode {
-        let m = trainer.set(mode)
+    func setTrainerMode(_ mode: TrainerMode, rider: Rider) -> TrainerMode {
+        let m = trainer.set(mode, rider: rider)
+        log(["src": "ble", "ev": "trainerSet", "mode": m.label, "zwift": trainer.speaksZwift,
+             "raw": (trainer.speaksZwift ? ZwiftHub.frames(m, rider: rider) : nil)?
+                 .map { $0.map { String(format: "%02x", $0) }.joined() } ?? []])
         // Downstream Orbeats won't hear this from the trainer either — we're
         // the writer. Notify them ourselves on the mirrored status char.
-        proxy.push(Trainer.machineStatus, Data(FtmsMachineStatus.encode(m)))
+        proxy.push(Trainer.machineStatus, Data(FtmsMachineStatus.encode(m, rider: rider)))
         return m
     }
 
