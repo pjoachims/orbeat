@@ -44,7 +44,7 @@ The iPhone is the one on the bike: it talks to your sensors and sets the trainer
 ### Riding a route
 
 ```mermaid
-flowchart LR
+flowchart TB
     GPX["🗺️ GPX route"] --> WHERE["📍 Where<br/>you are"]
     WHERE --> HILL["⛰️ How steep<br/>it is"]
     HILL --> BIKE["🚲 Trainer<br/>harder / easier"]
