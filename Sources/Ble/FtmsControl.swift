@@ -5,7 +5,8 @@ import CoreBluetooth
 /// Supports the three standard control targets via `TrainerMode`:
 /// - ERG (`0x05` set target power) — trainer holds constant watts
 /// - Resistance (`0x04` set target resistance levels)
-/// - Sim grade (`0x11` set indoor bike simulation parameters)
+/// - Sim grade (`0x11` set indoor bike simulation parameters), or Zwift
+///   Protocol (`ZwiftHub`) when the trainer has it
 ///
 /// ponytail: if a KICKR ignores FTMS, add the Wahoo proprietary path
 /// (svc A026EE01, char A026E005: unlock 20 EE FC). Reading capability flags
@@ -30,8 +31,24 @@ final class Trainer {
         p.writeValue(Data([0x07]), for: ch, type: .withResponse)   // start/resume
     }
 
+    /// Zwift Protocol channel on the same trainer (sync RX): sim + virtual
+    /// shifting go here when present, like Zwift does. Call after RideOn.
+    func attachZwift(_ p: CBPeripheral, rx ch: CBCharacteristic) {
+        zwiftPeripheral = p; zwiftRx = ch
+        ZwiftHub.initFrames.forEach { writeZwift($0) }
+    }
+    private weak var zwiftPeripheral: CBPeripheral?
+    private var zwiftRx: CBCharacteristic?
+    var speaksZwift: Bool { zwiftRx != nil && zwiftPeripheral != nil }
+
+    private func writeZwift(_ frame: [UInt8]) {
+        guard let ch = zwiftRx, let p = zwiftPeripheral else { return }
+        p.writeValue(Data(frame), for: ch, type: ch.properties.contains(.write) ? .withResponse : .withoutResponse)
+    }
+
     func detach() {
         peripheral = nil; control = nil; mode = nil
+        zwiftPeripheral = nil; zwiftRx = nil
     }
 
     /// Trainer told us its target (possibly set by another app) — adopt it so
@@ -42,8 +59,13 @@ final class Trainer {
     /// caller can keep its state in sync. Without attached hardware this
     /// still clamps and records — useful for tests and UI state.
     @discardableResult
-    func set(_ requested: TrainerMode) -> TrainerMode {
+    func set(_ requested: TrainerMode, rider: Rider) -> TrainerMode {
         let m = requested.clamped
+        if speaksZwift, let frames = ZwiftHub.frames(m, rider: rider) {
+            frames.forEach(writeZwift)
+            self.mode = m
+            return m
+        }
         guard let control, let p = peripheral else { return m }
         switch m {
         case .erg(let w):
@@ -54,11 +76,9 @@ final class Trainer {
             // the trainer's 0x2AD6 range characteristic; we send 0.1 % steps,
             // which KICKR-class trainers accept. ponytail: read 0x2AD6 instead.
             p.writeValue(i16Frame(0x04, pct * 10), for: control, type: .withResponse)
-        case .sim(let g):
-            // 0x11 Set Indoor Bike Simulation Parameters:
-            // wind(sint16, mm/s)=0, grade(sint16, 0.01%), crr(uint8)=0, cw(uint8)=0.
-            let u = UInt16(bitPattern: Int16(g))
-            p.writeValue(Data([0x11, 0x00, 0x00, UInt8(u & 0xFF), UInt8(u >> 8), 0x00, 0x00]),
+        case .sim:
+            // 0x11 Set Indoor Bike Simulation Parameters: terrain + virtual gear.
+            p.writeValue(Data([0x11] + m.simParams(rider: rider)!.bytes),
                          for: control, type: .withResponse)
         }
         self.mode = m

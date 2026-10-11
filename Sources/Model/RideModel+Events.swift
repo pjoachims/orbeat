@@ -51,15 +51,23 @@ extension RideModel {
             guard trainerMode == nil else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak ble] in
                 guard let self, attach == trainerAttach, localTrainer, trainerMode == nil else { return }
-                trainerMode = ble?.setTrainerMode(.sim(grade: grade))
+                trainerMode = ble?.setTrainerMode(.sim(grade: grade, gear: gear), rider: rider)
             }
         case .trainerLost:
             localTrainer = false
             trainerControllable = peer?.trainer != nil
             trainerMode = peer?.trainer
         case .trainerMode(let m):
-            // Trainer is the source of truth: follows changes made by any
-            // other client on the same trainer.
+            // Trainer is the source of truth for ERG/resistance: follows changes
+            // made by any other client on the same trainer. A sim frame only
+            // carries the grade the trainer got — terrain, difficulty and gear
+            // can't be split back out of it (and it may be our own late echo) —
+            // so sim follows the kind only and keeps our terrain + gear.
+            if case .sim = m {
+                if case .sim? = trainerMode { return }
+                trainerMode = .sim(grade: grade, gear: gear)
+                return
+            }
             trainerMode = m
             remember(m)
         }
@@ -79,6 +87,7 @@ extension RideModel {
             powerSource = "\(s.powerSource ?? "Power") · via \(label)"
             showPower(w, s.cadence)
         }
+        if !localTrainer, let r = s?.rider?.clamped, r != rider { rider = r }   // owner's settings win
         // Guarded: states arrive every second; unchanged writes would
         // re-render every view and hit UserDefaults each time.
         if !localTrainer, trainerMode != s?.trainer {
@@ -101,10 +110,11 @@ extension RideModel {
                           powerSource: pw != nil ? directPowerSource : nil,
                           trainer: localTrainer ? trainerMode : nil)
         s.recording = recording
+        s.rider = localTrainer ? rider : nil
         return s
     }
 
-    /// Step the LOCAL trainer's current mode: ERG ±5 W, resistance ±10 %, sim ±0.5 %.
+    /// Step the LOCAL trainer's current mode: ERG ±5 W, resistance ±10 %, sim ±1 gear.
     func press(_ inputs: [HandlebarInput], ble: BLEManager?) {
         guard var mode = trainerMode else { return }   // no trainer target yet
         for input in inputs {
@@ -116,8 +126,8 @@ extension RideModel {
     /// Push a target to the LOCAL trainer. A different kind (the picker)
     /// resumes that kind's last target.
     func setTrainer(_ mode: TrainerMode, ble: BLEManager?) {
-        let m = mode.sameKind(as: trainerMode) ? mode : mode.resumed(ergWatts: ergWatts, grade: grade)
-        trainerMode = ble?.setTrainerMode(m) ?? m.clamped
+        let m = mode.sameKind(as: trainerMode) ? mode : mode.resumed(ergWatts: ergWatts, grade: grade, gear: gear)
+        trainerMode = ble?.setTrainerMode(m, rider: rider) ?? m.clamped
         remember(trainerMode)
     }
 
@@ -125,17 +135,17 @@ extension RideModel {
     private func remember(_ m: TrainerMode?) {
         switch m {
         case .erg(let w)?: ergWatts = w
-        case .sim(let g)?: grade = g
+        case .sim(let g, let gr)?: grade = g; gear = gr
         default: break
         }
     }
 
-    private func showPower(_ w: Int, _ c: Int?) {
+    func showPower(_ w: Int, _ c: Int?) {
         watts = w
         cadence = c
         // Road-model speed, not the trainer's wheel speed (bogus in ERG).
-        if case .sim(let g) = trainerMode { speedKmh = RoadSpeed.kmh(watts: w, gradePercent: Double(g) / 100) }
-        else { speedKmh = RoadSpeed.kmh(watts: w) }
+        if case .sim(let g, _) = trainerMode { speedKmh = RoadSpeed.kmh(watts: w, gradePercent: Double(g) / 100, massKg: rider.massKg) }
+        else { speedKmh = RoadSpeed.kmh(watts: w, massKg: rider.massKg) }
         touch()   // power packets count as a sync too
     }
 }

@@ -3,13 +3,13 @@ import Foundation
 /// Virtual road speed from power, like Zwift: the trainer's own wheel speed
 /// is meaningless in ERG (it follows the flywheel), so speed and distance
 /// come from a steady-state road model instead.
-/// ponytail: fixed rider (85 kg incl. bike, CdA 0.32, Crr 0.004); make them
-/// settings if riders differ a lot.
+/// Mass comes from the rider settings. ponytail: fixed CdA 0.32 / Crr 0.004;
+/// make them settings if speeds read off.
 enum RoadSpeed {
     static let massKg = 85.0, cdA = 0.32, crr = 0.004, rho = 1.2, g = 9.81
 
     /// km/h holding `watts` on `gradePercent`; 0 when not pedalling.
-    static func kmh(watts: Int, gradePercent: Double = 0) -> Double {
+    static func kmh(watts: Int, gradePercent: Double = 0, massKg: Double = massKg) -> Double {
         guard watts > 0 else { return 0 }
         let p = Double(watts)
         let a = 0.5 * rho * cdA

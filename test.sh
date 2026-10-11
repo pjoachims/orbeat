@@ -22,6 +22,7 @@ swiftc -O \
   Sources/Drivers/Standard/HeartRateParse.swift \
   Sources/Drivers/Zwift/ZwiftButtonFrame.swift \
   Sources/Drivers/Zwift/ButtonDecoder.swift \
+  Sources/Drivers/Zwift/ZwiftHub.swift \
   Tests/Harness.swift \
   Tests/ErgsTests.swift \
   Tests/TrainerModeTests.swift \

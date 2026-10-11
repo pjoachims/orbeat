@@ -8,5 +8,6 @@ enum RoadSpeedTests {
         check("speed climbs slower", RoadSpeed.kmh(watts: 200, gradePercent: 8) < 15)
         check("speed descends faster", RoadSpeed.kmh(watts: 100, gradePercent: -3) > RoadSpeed.kmh(watts: 100))
         check("speed monotonic in watts", RoadSpeed.kmh(watts: 250) > RoadSpeed.kmh(watts: 200))
+        check("heavier climbs slower", RoadSpeed.kmh(watts: 250, gradePercent: 6, massKg: 100) < RoadSpeed.kmh(watts: 250, gradePercent: 6, massKg: 70))
     }
 }

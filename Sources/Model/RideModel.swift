@@ -49,6 +49,15 @@ final class RideModel: ObservableObject {
     @Published var grade: Int = UserDefaults.standard.object(forKey: "grade") as? Int ?? 0 {
         didSet { UserDefaults.standard.set(grade, forKey: "grade") }
     }
+    /// Virtual gear in sim (1…24). Persisted.
+    @Published var gear: Int = UserDefaults.standard.object(forKey: "gear") as? Int ?? TrainerMode.neutralGear {
+        didSet { UserDefaults.standard.set(gear, forKey: "gear") }
+    }
+    /// Rider/bike weight and Trainer Difficulty for sim. Persisted.
+    @Published var rider: Rider = UserDefaults.standard.data(forKey: "rider")
+        .flatMap { try? JSONDecoder().decode(Rider.self, from: $0) } ?? Rider() {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(rider), forKey: "rider") }
+    }
     /// True once a controllable trainer (FTMS control point) is connected.
     @Published var trainerControllable = false
     /// Current trainer control target (ERG watts / resistance / sim grade);

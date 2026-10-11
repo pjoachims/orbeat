@@ -117,9 +117,11 @@ struct ErgsTests {
               && FtmsMachineStatus.parse([0x08]) == nil)
 
         // MARK: bridge: control-point write → mode → synthesized status
-        for m in [TrainerMode.sim(grade: -100), .sim(grade: 800), .erg(targetWatts: 250), .resistance(percent: 40)] {
-            check("status encode round-trips \(m)", FtmsMachineStatus.parse(FtmsMachineStatus.encode(m)) == m)
+        for m in [TrainerMode.erg(targetWatts: 250), .resistance(percent: 40)] {
+            check("status encode round-trips \(m)", FtmsMachineStatus.parse(FtmsMachineStatus.encode(m, rider: Rider())) == m)
         }
+        check("status sends sim params", FtmsMachineStatus.encode(.sim(grade: 500, gear: 1), rider: Rider())
+              == [0x12] + TrainerMode.sim(grade: 500, gear: 1).simParams(rider: Rider())!.bytes)
         check("control sim write", FtmsControlFrame.parse([0x11, 0, 0, 0x20, 0x03, 0, 0]) == .sim(grade: 800))
         check("control erg write", FtmsControlFrame.parse([0x05, 0xC8, 0x00]) == .erg(targetWatts: 200))
         check("control resistance write", FtmsControlFrame.parse([0x04, 0x90, 0x01]) == .resistance(percent: 40))
