@@ -33,34 +33,22 @@ Orbeat pairs directly with your Bluetooth sensors. It shows the ride live and le
 ## How it works
 
 ```mermaid
-flowchart LR
-    subgraph Sensors
-        HR["❤️ HR strap<br/>(Polar H10…)"]
-        KICKR["🚲 Smart trainer<br/>KICKR / any FTMS"]
-        RIDE["🎮 Zwift Ride<br/>controller"]
-    end
+flowchart TB
+    HR["❤️ HR strap"]
+    KICKR["🚲 Smart trainer<br/>KICKR / any FTMS"]
+    RIDE["🎮 Zwift Ride controller"]
 
-    subgraph iPhone["📱 iPhone (on the bike)"]
-        IHUB[BleHub + drivers]
-        IMODEL[RideModel]
-        IHUB --> IMODEL
-    end
+    IPHONE["📱 iPhone (on the bike)<br/>BleHub → drivers → RideModel"]
+    MAC["💻 Mac (menu bar)<br/>BleHub → drivers → RideModel"]
 
-    subgraph Mac["💻 Mac (menu bar)"]
-        MHUB[BleHub + drivers]
-        MMODEL[RideModel]
-        MHUB --> MMODEL
-    end
+    HR -- heart rate --> IPHONE
+    RIDE -- paddle presses --> IPHONE
+    KICKR -- "power · cadence" --> IPHONE
+    IPHONE -- "grade + gear<br/>(Zwift Protocol / FTMS)" --> KICKR
+    HR -. "optional, direct" .-> MAC
+    KICKR -. "optional, direct" .-> MAC
 
-    HR -- "HR 0x180D" --> IHUB
-    RIDE -- "button frames" --> IHUB
-    KICKR -- "power · cadence" --> IHUB
-    IHUB -- "Zwift Protocol / FTMS<br/>grade + gear" --> KICKR
-
-    HR -.-> MHUB
-    KICKR -.-> MHUB
-
-    IMODEL <== "Peer link (BLE GATT)<br/>readings · trainer target · commands" ==> MMODEL
+    IPHONE <== "Peer link · BLE GATT<br/>readings · trainer target · commands" ==> MAC
 ```
 
 - **Either device can own a sensor.** Each side publishes only what it reads *directly* (`PeerWire`, compact JSON of 180 bytes or less per message), and the other side fills in the rest. Nothing echoes back and forth.
