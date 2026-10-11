@@ -61,7 +61,7 @@ To start a route, open a `.gpx` file in Orbeat (from Files, AirDrop or a link) o
 2. Pair your equipment: on the iPhone go to **Settings → Equipment**; on the Mac, right-click the menu-bar icon → **Connect Equipment**.
 3. Set your weight in Settings, and start pedalling.
 
-Works with the Wahoo KICKR (including the KICKR CORE Zwift One) and other smart trainers that support the standard FTMS protocol.
+Tested on a Wahoo KICKR CORE Zwift One. Other smart trainers that support the standard FTMS protocol should work too.
 
 ## For developers
 
