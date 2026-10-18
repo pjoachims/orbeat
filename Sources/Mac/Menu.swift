@@ -47,6 +47,13 @@ extension AppDelegate {
                                    action: #selector(rideRoute), keyEquivalent: "")
             route.target = self
             menu.addItem(route)
+            let workout = NSMenuItem(title: model.workout == nil ? "Ride Workout…" : "Stop Workout — \(model.workout!.name)",
+                                     action: #selector(rideWorkout), keyEquivalent: "")
+            workout.target = self
+            menu.addItem(workout)
+            let build = NSMenuItem(title: "Build Workout on ZWOFactory…", action: #selector(buildWorkout), keyEquivalent: "")
+            build.target = self
+            menu.addItem(build)
         }
         menu.addItem(.separator())
         menu.addEquipmentSubmenu(from: ble, target: self)
@@ -95,6 +102,10 @@ extension AppDelegate {
         core.setRider(r)
     }
 
+    @objc func setFTP(_ sender: NSMenuItem) {
+        if let w = sender.representedObject as? Int { model.ftp = w }
+    }
+
     @objc func toggleRebroadcast() {
         ble?.proxy.enabled.toggle()
     }
@@ -107,6 +118,17 @@ extension AppDelegate {
         NSApp.activate()
         if panel.runModal() == .OK, let url = panel.url { core.open(url) }
     }
+
+    @objc func rideWorkout() {
+        guard model.workout == nil else { return core.train(nil) }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = Workout.extensions.compactMap { UTType(filenameExtension: $0) }
+        panel.message = "Ride a .zwo, .erg or .mrc workout in ERG (% of FTP: \(model.ftp) W)."
+        NSApp.activate()
+        if panel.runModal() == .OK, let url = panel.url { core.open(url) }
+    }
+
+    @objc func buildWorkout() { NSWorkspace.shared.open(URL(string: "https://zwofactory.com")!) }
 
     @objc func harder() { applyRidePress([.shiftUp]) }
     @objc func easier() { applyRidePress([.shiftDown]) }
@@ -243,6 +265,17 @@ private extension NSMenu {
         section("Bike Weight", Array(6...15), "kg", { var n = r; n.bikeKg = $0; return n }, r.bikeKg)
         sub.addItem(.separator())
         section("Trainer Difficulty", Rider.difficulties, "%", { var n = r; n.difficulty = $0; return n }, r.difficulty)
+        sub.addItem(.separator())
+        let header = NSMenuItem(title: "FTP (workouts in %)", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        sub.addItem(header)
+        for w in Array(stride(from: 100, through: 450, by: 25)) + (model.ftp % 25 == 0 ? [] : [model.ftp]) {
+            let item = NSMenuItem(title: "\(w) W", action: #selector(AppDelegate.setFTP(_:)), keyEquivalent: "")
+            item.target = target
+            item.representedObject = w
+            item.state = w == model.ftp ? .on : .off
+            sub.addItem(item)
+        }
         riderItem.submenu = sub
         addItem(riderItem)
     }

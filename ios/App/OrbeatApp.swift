@@ -16,7 +16,7 @@ struct OrbeatApp: App {
                     .tabItem { Label("Sessions", systemImage: "chart.xyaxis.line") }
             }
             .preferredColorScheme(.dark)
-            .onOpenURL { core.open($0) }   // .gpx from Files/share sheet, orbeat://ride?gpx=
+            .onOpenURL { core.open($0) }   // .gpx/.zwo/.erg/.mrc from Files/share sheet, orbeat://ride?gpx=
         }
     }
 }
@@ -111,6 +111,10 @@ struct ContentView: View {
                 RouteCard(route: route, meters: model.routeMeters, padding: 14) { core.ride(nil) }
                     .padding(.top, 8)
             }
+            if let workout = model.workout {
+                WorkoutCard(workout: workout, seconds: model.workoutSeconds, padding: 14) { core.train(nil) }
+                    .padding(.top, 8)
+            }
             if model.trainerControllable {
                 TrainerStepper(mode: model.trainerMode, padding: 14,
                                onStep: { applyRidePress([$0]) }, onSet: core.setTrainer,
@@ -128,6 +132,7 @@ struct ContentView: View {
         // Route opens once the sheet is gone: an error alert can't present over it.
         .sheet(isPresented: $showDevices, onDismiss: { pendingRoute.map(core.open); pendingRoute = nil }) {
             SettingsSheet(ble: ble, model: model, recorder: recorder, setRider: core.setRider, openRoute: { pendingRoute = $0 },
+                          train: { core.train($0) },
                           vibrateEvery: $vibrateEvery,
                           island: Binding(get: { activity != nil },
                                           set: { $0 ? startActivity() : endActivity() }))
@@ -224,12 +229,14 @@ struct SettingsSheet: View {
     @ObservedObject var recorder: Recorder
     let setRider: (Rider) -> Void
     let openRoute: (URL) -> Void
+    let train: (Workout) -> Void
     @Binding var vibrateEvery: Int
     @Binding var island: Bool
     // ponytail: 1s tick re-reads ble.discovered (not observable); fine for a settings sheet
     @State private var tick = 0
     @State private var scanAll = false
     @State private var pickRoute = false
+    @State private var build = false
     @Environment(\.dismiss) private var dismiss
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -276,11 +283,24 @@ struct SettingsSheet: View {
                     Picker("Trainer Difficulty", selection: riderBinding(\.difficulty)) {
                         ForEach(Rider.difficulties, id: \.self) { Text("\($0) %").tag($0) }
                     }
+                    Stepper("FTP \(model.ftp) W", value: $model.ftp, in: 50...500, step: 5)
                 }
-                Section(footer: Text("Rides a GPX track's hills in sim, at your road speed. Gears stay yours.")) {
-                    Button { pickRoute = true } label: {
-                        Label("Ride a GPX Route…", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                // Three tiles in one row; the two workout ones share a card.
+                Section(footer: Text("GPX rides a track's hills in sim. Workouts (.zwo, .erg, .mrc) run ERG at your FTP. Or build your own right here.")) {
+                    HStack(spacing: 0) {
+                        let r = tileRadius
+                        tile("Ride GPX", "point.topleft.down.to.point.bottomright.curvepath") { pickRoute = true }
+                            .clipShape(.rect(cornerRadius: r))
+                        Spacer().frame(width: 8)
+                        tile("Ride Workout", "chart.bar.xaxis") { pickRoute = true }
+                            .clipShape(.rect(topLeadingRadius: r, bottomLeadingRadius: r))
+                        Divider().padding(.vertical, 12).background(Color(.secondarySystemGroupedBackground))
+                        tile("Build Workout", "square.and.pencil") { build = true }
+                            .clipShape(.rect(bottomTrailingRadius: r, topTrailingRadius: r))
                     }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
                 Section(header: Text("Heart-rate alert"),
                         footer: Text("Vibrates while you're over the limit; a notification when Orbeat is in the background.")) {
@@ -318,7 +338,11 @@ struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Settings")
-            .fileImporter(isPresented: $pickRoute, allowedContentTypes: [UTType(filenameExtension: "gpx") ?? .xml]) {
+            .navigationDestination(isPresented: $build) {
+                WorkoutBuilder(riderFTP: model.ftp) { train($0); dismiss() }
+            }
+            .fileImporter(isPresented: $pickRoute, allowedContentTypes: [UTType(filenameExtension: "gpx") ?? .xml]
+                          + Workout.extensions.compactMap { UTType(filenameExtension: $0) }) {
                 guard case .success(let url) = $0 else { return }
                 openRoute(url)
                 dismiss()
@@ -326,6 +350,21 @@ struct SettingsSheet: View {
             .onReceive(timer) { _ in tick += 1 }
             .onDisappear { ble?.setScanAll(false) }
         }
+    }
+
+    private var tileRadius: CGFloat { if #available(iOS 26, *) { 26 } else { 10 } }
+
+    private func tile(_ title: String, _ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon).font(.title3)
+                Text(title).font(.footnote).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.vertical, 12)
+            .background(Color(.secondarySystemGroupedBackground))
+        }
+        .buttonStyle(.borderless)   // else the list row fires every button in it
     }
 
     private func riderBinding(_ key: WritableKeyPath<Rider, Int>) -> Binding<Int> {

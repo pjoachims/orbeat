@@ -18,6 +18,17 @@
 				<string>com.topografix.gpx</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Workout</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.zwift.zwo</string>
+				<string>com.vibecode.orbeat.erg</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -82,6 +93,41 @@
 				<key>public.mime-type</key>
 				<array>
 					<string>application/gpx+xml</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.xml</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Zwift workout</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.zwift.zwo</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>zwo</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>ERG / MRC workout</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.vibecode.orbeat.erg</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>erg</string>
+					<string>mrc</string>
 				</array>
 			</dict>
 		</dict>
