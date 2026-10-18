@@ -8,6 +8,9 @@ import Security
 /// ponytail: no retry timer; a failed upload waits for the next session or launch.
 enum RideUpload {
     static let urlKey = "rideUploadURL"
+    /// Upload on every store change and launch; off = only the manual Upload button.
+    static let autoKey = "rideUploadAuto"
+    static var auto: Bool { UserDefaults.standard.object(forKey: autoKey) as? Bool ?? true }
     private static let doneKey = "rideUploadDone"
     private static var busy = false
     /// Sessions handed in while busy: sent after the running chain.
@@ -88,6 +91,24 @@ enum RideUpload {
                                           forKey: doneKey)
                 send(todo.dropFirst(), to: endpoint, token: token,
                      sent: sent + (status == 200 ? 1 : 0), of: total, report: report)
+            }
+        }.resume()
+    }
+
+    /// Checks URL + token against the backend's status route; reports its ride count.
+    static func test(report: @escaping (String) -> Void) {
+        guard let base = URL(string: url), base.scheme != nil, !token.isEmpty else {
+            return report("Set URL and token first")
+        }
+        var req = URLRequest(url: base.appendingPathComponent("status"))
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: req) { data, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let derived = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any])?["derived"]
+            let rides = (derived as? [[String: Any]])?.first { $0["kind"] as? String == "ride" }?["n"] as? Int ?? 0
+            DispatchQueue.main.async {
+                report(status == 200 ? "Connected · \(rides) rides on backend"
+                                     : "Failed: \(error?.localizedDescription ?? "HTTP \(status)")")
             }
         }.resume()
     }

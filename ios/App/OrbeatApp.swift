@@ -235,6 +235,7 @@ struct SettingsSheet: View {
     @AppStorage(RideUpload.urlKey) private var uploadURL = ""
     @State private var uploadToken = RideUpload.token
     @State private var uploadStatus = ""
+    @AppStorage(RideUpload.autoKey) private var uploadAuto = true
     @Environment(\.dismiss) private var dismiss
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -317,11 +318,22 @@ struct SettingsSheet: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     SecureField("Token", text: $uploadToken)
-                    Button("Upload Now") {
-                        if uploadToken != RideUpload.token { RideUpload.token = uploadToken }
-                        uploadStatus = "Uploading…"
-                        upload { uploadStatus = $0 }
+                    // Borderless: several buttons in one List row each keep their own tap.
+                    HStack(spacing: 20) {
+                        Button("Test") {
+                            saveToken()
+                            uploadStatus = "Testing…"
+                            RideUpload.test { uploadStatus = $0 }
+                        }
+                        Button("Upload") {
+                            saveToken()
+                            uploadStatus = "Uploading…"
+                            upload { uploadStatus = $0 }
+                        }
+                        Spacer()
+                        Toggle("Auto", isOn: $uploadAuto).fixedSize()
                     }
+                    .buttonStyle(.borderless)
                     if !uploadStatus.isEmpty { Text(uploadStatus).foregroundStyle(.secondary) }
                 }
                 // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
@@ -345,10 +357,14 @@ struct SettingsSheet: View {
             .onReceive(timer) { _ in tick += 1 }
             .onDisappear {
                 ble?.setScanAll(false)
-                if uploadToken != RideUpload.token { RideUpload.token = uploadToken }
-                upload(nil)
+                saveToken()
+                if uploadAuto { upload(nil) }
             }
         }
+    }
+
+    private func saveToken() {
+        if uploadToken != RideUpload.token { RideUpload.token = uploadToken }
     }
 
     private func riderBinding(_ key: WritableKeyPath<Rider, Int>) -> Binding<Int> {

@@ -174,7 +174,7 @@ final class SessionStore: ObservableObject {
     private func reload() {
         let all = FetchDescriptor<SessionRecord>(sortBy: [SortDescriptor(\.start, order: .reverse)])
         past = ((try? context.fetch(all)) ?? []).map(\.session)
-        RideUpload.run(past)
+        if RideUpload.auto { RideUpload.run(past) }
     }
 
     /// Retry unsent rides now, e.g. after the backend settings changed.
