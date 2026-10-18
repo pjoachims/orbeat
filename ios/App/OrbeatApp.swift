@@ -128,6 +128,7 @@ struct ContentView: View {
         // Route opens once the sheet is gone: an error alert can't present over it.
         .sheet(isPresented: $showDevices, onDismiss: { pendingRoute.map(core.open); pendingRoute = nil }) {
             SettingsSheet(ble: ble, model: model, recorder: recorder, setRider: core.setRider, openRoute: { pendingRoute = $0 },
+                          upload: store.upload,
                           vibrateEvery: $vibrateEvery,
                           island: Binding(get: { activity != nil },
                                           set: { $0 ? startActivity() : endActivity() }))
@@ -224,12 +225,15 @@ struct SettingsSheet: View {
     @ObservedObject var recorder: Recorder
     let setRider: (Rider) -> Void
     let openRoute: (URL) -> Void
+    let upload: () -> Void
     @Binding var vibrateEvery: Int
     @Binding var island: Bool
     // ponytail: 1s tick re-reads ble.discovered (not observable); fine for a settings sheet
     @State private var tick = 0
     @State private var scanAll = false
     @State private var pickRoute = false
+    @AppStorage(RideUpload.urlKey) private var uploadURL = ""
+    @State private var uploadToken = RideUpload.token
     @Environment(\.dismiss) private var dismiss
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -305,6 +309,14 @@ struct SettingsSheet: View {
                 Section {
                     Toggle("Dynamic Island", isOn: $island)
                 }
+                Section(header: Text("Health backend"),
+                        footer: Text("Finished rides go to your own fitbit-air backend.")) {
+                    TextField("https://…", text: $uploadURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    SecureField("Token", text: $uploadToken)
+                }
                 // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
                 Section(header: Text("Debug")) {
                     Toggle("Log ride", isOn: $recorder.recording)
@@ -324,7 +336,11 @@ struct SettingsSheet: View {
                 dismiss()
             }
             .onReceive(timer) { _ in tick += 1 }
-            .onDisappear { ble?.setScanAll(false) }
+            .onDisappear {
+                ble?.setScanAll(false)
+                if uploadToken != RideUpload.token { RideUpload.token = uploadToken }
+                upload()
+            }
         }
     }
 

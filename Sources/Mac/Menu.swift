@@ -64,6 +64,10 @@ extension AppDelegate {
         cloudItem.target = self
         cloudItem.state = SessionStore.cloudSync ? .on : .off
         menu.addItem(cloudItem)
+        let backendItem = NSMenuItem(title: "Health Backend…", action: #selector(editBackend), keyEquivalent: "")
+        backendItem.target = self
+        backendItem.state = RideUpload.url.isEmpty ? .off : .on
+        menu.addItem(backendItem)
         let logItem = NSMenuItem(title: "Log Ride (JSONL)",
                                  action: #selector(toggleDuckDBLog), keyEquivalent: "")
         logItem.target = self
@@ -119,6 +123,28 @@ extension AppDelegate {
         relaunch.arguments = ["-c", "sleep 1; open \"$0\"", Bundle.main.bundlePath]
         try? relaunch.run()
         NSApp.terminate(nil)
+    }
+
+    /// URL + token of the user's own fitbit-air backend; finished rides go there.
+    @objc func editBackend() {
+        let url = NSTextField(string: RideUpload.url)
+        url.placeholderString = "https://…"
+        let token = NSSecureTextField(string: RideUpload.token)
+        token.placeholderString = "Token"
+        let stack = NSStackView(views: [url, token])
+        stack.orientation = .vertical
+        stack.frame = NSRect(x: 0, y: 0, width: 320, height: 52)
+        let alert = NSAlert()
+        alert.messageText = "Health Backend"
+        alert.informativeText = "Finished rides go to your own fitbit-air backend."
+        alert.accessoryView = stack
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate()
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        UserDefaults.standard.set(url.stringValue.trimmingCharacters(in: .whitespaces), forKey: RideUpload.urlKey)
+        RideUpload.token = token.stringValue.trimmingCharacters(in: .whitespaces)
+        core.store.upload()
     }
 
     @objc func toggleDuckDBLog() {
