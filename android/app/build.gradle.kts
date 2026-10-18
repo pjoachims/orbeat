@@ -12,7 +12,7 @@ android {
         minSdk = 33   // Android 13: the non-deprecated GATT write/notify APIs
         targetSdk = 36
         versionCode = 3
-        versionName = "1.2.0"
+        versionName = "0.1.1"
     }
     buildFeatures { compose = true }
     compileOptions {
