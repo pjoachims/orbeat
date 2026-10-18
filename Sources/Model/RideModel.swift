@@ -70,6 +70,19 @@ final class RideModel: ObservableObject {
     @Published var routeMeters: Double = UserDefaults.standard.double(forKey: "routeMeters") {
         didSet { UserDefaults.standard.set(routeMeters, forKey: "routeMeters") }
     }
+    /// Workout being ridden: ERG follows its targets (AppCore). Persisted with
+    /// the time into it, like a route.
+    @Published var workout: Workout? = UserDefaults.standard.data(forKey: "workout")
+        .flatMap { try? JSONDecoder().decode(Workout.self, from: $0) } {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(workout), forKey: "workout") }
+    }
+    @Published var workoutSeconds: Double = UserDefaults.standard.double(forKey: "workoutSeconds") {
+        didSet { UserDefaults.standard.set(workoutSeconds, forKey: "workoutSeconds") }
+    }
+    /// For workouts in % of FTP (.zwo, .mrc), converted when loaded. Persisted.
+    @Published var ftp: Int = UserDefaults.standard.object(forKey: "ftp") as? Int ?? 200 {
+        didSet { UserDefaults.standard.set(ftp, forKey: "ftp") }
+    }
     /// True once a controllable trainer (FTMS control point) is connected.
     @Published var trainerControllable = false
     /// Current trainer control target (ERG watts / resistance / sim grade);

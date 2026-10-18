@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibecode.orbeat.core.HandlebarInput
 import com.vibecode.orbeat.core.Route
+import com.vibecode.orbeat.core.Workout
 import com.vibecode.orbeat.core.TrainerMode
 import com.vibecode.orbeat.model.RideModel
 import java.util.Locale
@@ -175,11 +177,12 @@ fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) =
     }
 
 @Composable
-private fun StepButton(symbol: String, action: () -> Unit) =
-    Box(Modifier.size(width = 36.dp, height = 30.dp).clip(RoundedCornerShape(8.dp))
-        .background(Color.White.copy(alpha = 0.1f)).clickable(onClick = action), contentAlignment = Alignment.Center) {
-        Text(symbol, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-    }
+fun StepButton(symbol: String, action: () -> Unit) = StepButton(true, action) { Text(symbol, fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+
+@Composable
+fun StepButton(enabled: Boolean, action: () -> Unit, content: @Composable () -> Unit) =
+    Box(Modifier.size(width = 36.dp, height = 30.dp).alpha(if (enabled) 1f else 0.3f).clip(RoundedCornerShape(8.dp))
+        .background(Color.White.copy(alpha = 0.1f)).clickable(enabled, onClick = action), contentAlignment = Alignment.Center) { content() }
 
 @Composable
 private fun StepRow(eyebrow: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit) =
@@ -260,4 +263,37 @@ fun RouteCard(route: Route, meters: Double, onStop: () -> Unit) =
             drawCircle(OrbeatRed, 4.dp.toPx(), point(at))
         }
         Text(fmt("%.0f m climbing", route.climb), fontSize = 11.sp, color = tertiary)
+    }
+
+/** Workout mode: name, time, current target and the power profile with the ridden part filled in. */
+@Composable
+fun WorkoutCard(workout: Workout, seconds: Double, onStop: () -> Unit) =
+    Column(Modifier.fillMaxWidth().tile(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { Eyebrow("Workout · ${workout.name}") }
+            Icon(Icons.Filled.Close, "Stop this workout", Modifier.size(18.dp).clickable(onClick = onStop), tint = secondary)
+        }
+        Row {
+            Text("${clock(seconds)} / ${clock(workout.length)}", Modifier.weight(1f),
+                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, style = Mono)
+            Text(workout.watts(seconds)?.let { "$it W" } ?: "Finished", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, style = Mono)
+        }
+        val base = Color.White.copy(alpha = 0.12f)
+        Canvas(Modifier.fillMaxWidth().height(44.dp)) {
+            val total = max(1.0, workout.length)
+            val top = max(1, workout.steps.maxOf { max(it.from, it.to) }).toFloat()
+            fun y(w: Int) = size.height * (1 - w / top * 0.9f)
+            var t = 0.0
+            val p = Path().apply {
+                moveTo(0f, size.height)
+                for (s in workout.steps) {
+                    lineTo((size.width * t / total).toFloat(), y(s.from))
+                    t += s.seconds
+                    lineTo((size.width * t / total).toFloat(), y(s.to))
+                }
+                lineTo(size.width, size.height); close()
+            }
+            drawPath(p, base)
+            clipRect(right = (size.width * min(1.0, seconds / total)).toFloat()) { drawPath(p, OrbeatRed.copy(alpha = 0.55f)) }
+        }
     }

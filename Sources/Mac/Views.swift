@@ -27,6 +27,7 @@ struct HeartCard: View {
     var onSet: ((TrainerMode) -> Void)? = nil
     /// Route card's ✕; nil hides the card.
     var onStopRoute: (() -> Void)? = nil
+    var onStopWorkout: (() -> Void)? = nil
 
     private var live: Bool { model.hasData && model.isFresh }
     private var zone: Color { live ? rideZoneColor(model.bpm) : .secondary }
@@ -92,7 +93,7 @@ struct HeartCard: View {
             .overlay(Divider(), alignment: .bottom)
 
             // power metrics + trainer
-            if model.watts != nil || model.trainerControllable || model.route != nil {
+            if model.watts != nil || model.trainerControllable || model.route != nil || model.workout != nil {
                 VStack(spacing: 6) {
                     if model.watts != nil {
                         HStack(spacing: 6) {
@@ -106,6 +107,9 @@ struct HeartCard: View {
                     }
                     if let route = model.route, let onStopRoute {
                         RouteCard(route: route, meters: model.routeMeters, padding: compact ? 10 : 12, onStop: onStopRoute)
+                    }
+                    if let workout = model.workout, let onStopWorkout {
+                        WorkoutCard(workout: workout, seconds: model.workoutSeconds, padding: compact ? 10 : 12, onStop: onStopWorkout)
                     }
                     if model.trainerControllable, let onStep {
                         TrainerStepper(mode: model.trainerMode, padding: compact ? 10 : 12, onStep: onStep, onSet: onSet,

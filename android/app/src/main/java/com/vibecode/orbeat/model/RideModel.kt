@@ -20,6 +20,7 @@ import com.vibecode.orbeat.core.Route
 import com.vibecode.orbeat.core.SensorEvent
 import com.vibecode.orbeat.core.SessionClock
 import com.vibecode.orbeat.core.TrainerMode
+import com.vibecode.orbeat.core.Workout
 import com.vibecode.orbeat.core.now
 import org.json.JSONArray
 import org.json.JSONObject
@@ -62,6 +63,13 @@ class RideModel(private val prefs: SharedPreferences) {
     /** Why the last route couldn't be opened; the UI shows it once and clears it. */
     var routeError by mutableStateOf<String?>(null)
     var routeMeters by pref(prefs.getFloat("routeMeters", 0f).toDouble()) { prefs.edit().putFloat("routeMeters", it.toFloat()).apply() }
+    /** Workout being ridden: ERG follows its targets (AppCore). Persisted with the time into it, like a route. */
+    var workout by pref(prefs.getString("workout", null)?.let(::decodeWorkout)) {
+        prefs.edit().putString("workout", it?.let(::encodeWorkout)).apply()
+    }
+    var workoutSeconds by pref(prefs.getFloat("workoutSeconds", 0f).toDouble()) { prefs.edit().putFloat("workoutSeconds", it.toFloat()).apply() }
+    /** For workouts in % of FTP (.zwo, .mrc), converted when loaded. */
+    var ftp by pref(prefs.getInt("ftp", 200)) { prefs.edit().putInt("ftp", it).apply() }
     var trainerControllable by mutableStateOf(false)
     var trainerMode by mutableStateOf<TrainerMode?>(null)
     private var isLive = false
@@ -272,6 +280,16 @@ class RideModel(private val prefs: SharedPreferences) {
             val o = JSONObject(s)
             fun list(k: String) = o.getJSONArray(k).let { a -> List(a.length()) { a.getDouble(it) } }
             Route(o.getString("name"), list("dist"), list("ele"))
+        }.getOrNull()
+
+        fun encodeWorkout(w: Workout): String = JSONObject().put("name", w.name).put("steps", JSONArray(w.steps.map {
+            JSONObject().put("s", it.seconds).put("f", it.from).put("t", it.to)
+        })).toString()
+
+        fun decodeWorkout(s: String): Workout? = runCatching {
+            val o = JSONObject(s)
+            val a = o.getJSONArray("steps")
+            Workout(o.getString("name"), List(a.length()) { a.getJSONObject(it).run { Workout.Step(getDouble("s"), getInt("f"), getInt("t")) } })
         }.getOrNull()
     }
 }

@@ -80,6 +80,10 @@ fun LiveScreen(core: AppCore, openSettings: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             RouteCard(r, m.routeMeters) { core.ride(null) }
         }
+        m.workout?.let { w ->
+            Spacer(Modifier.height(8.dp))
+            WorkoutCard(w, m.workoutSeconds) { core.train(null) }
+        }
         if (m.trainerControllable) {
             Spacer(Modifier.height(8.dp))
             TrainerStepper(m.trainerMode, core::step, core::setTrainer, hill = m.route == null)

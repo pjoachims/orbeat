@@ -3,21 +3,30 @@ package com.vibecode.orbeat.ui
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
@@ -33,8 +42,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -59,7 +71,7 @@ private fun Section(header: String? = null, footer: String? = null, rows: List<@
 
 /** Everything set once per ride or less: sharing, equipment, rider, alert, notification, debug log. */
 @Composable
-fun SettingsScreen(core: AppCore, back: () -> Unit) {
+fun SettingsScreen(core: AppCore, back: () -> Unit, build: () -> Unit) {
     val ctx = LocalContext.current
     val m = core.model
     val ble = core.ble
@@ -106,9 +118,20 @@ fun SettingsScreen(core: AppCore, back: () -> Unit) {
                 IosStepper({ rider(m.rider.copy(bikeKg = maxOf(Rider.bikeRange.first, m.rider.bikeKg - 1))) },
                     { rider(m.rider.copy(bikeKg = minOf(Rider.bikeRange.last, m.rider.bikeKg + 1))) }) } },
             { PickerCell("Trainer Difficulty", Rider.difficulties, m.rider.difficulty, { "$it %" }) { rider(m.rider.copy(difficulty = it)) } },
+            { Cell { Text("FTP ${m.ftp} W", Modifier.weight(1f))
+                IosStepper({ m.ftp = maxOf(50, m.ftp - 5) }, { m.ftp = minOf(500, m.ftp + 5) }) } },
         ))
-        Section(footer = "Rides a GPX track's hills in sim, at your road speed. Gears stay yours.", rows = listOf {
-            Cell({ pickRoute.launch(arrayOf("*/*")) }) { Icon(painterResource(R.drawable.ic_route), null, Modifier.size(24.dp), tint = Blue); Text("Ride a GPX Route…", color = Blue) }
+        // Three tiles in one row; the two workout ones share a card.
+        Section(footer = "GPX rides a track's hills in sim. Workouts (.zwo, .erg, .mrc) run ERG at your FTP. Or build your own right here.", rows = listOf {
+            val pick = { pickRoute.launch(arrayOf("*/*")) }
+            Row(Modifier.height(IntrinsicSize.Min).background(SheetBg), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Tile(painterResource(R.drawable.ic_route), "Ride GPX", Modifier.weight(1f).clip(RoundedCornerShape(26.dp)), pick)
+                Row(Modifier.weight(2f).clip(RoundedCornerShape(26.dp))) {
+                    Tile(painterResource(R.drawable.ic_workout), "Ride Workout", Modifier.weight(1f), pick)
+                    Box(Modifier.width(0.5.dp).fillMaxHeight().background(SheetCell).padding(vertical = 12.dp).background(Separator))
+                    Tile(rememberVectorPainter(Icons.Filled.Edit), "Build Workout", Modifier.weight(1f), build)
+                }
+            }
         })
         Section("Heart-rate alert", "Vibrates while you're over the limit; a notification when Orbeat is in the background.", listOf(
             { Cell {
@@ -142,6 +165,14 @@ fun SettingsScreen(core: AppCore, back: () -> Unit) {
         if (ble == null) Text("No Bluetooth on the emulator — showing a simulated ride.", Modifier.padding(16.dp), color = secondary)
     }
 }
+
+@Composable
+private fun Tile(icon: Painter, label: String, modifier: Modifier, onClick: () -> Unit) =
+    Column(modifier.fillMaxHeight().background(SheetCell).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(icon, null, Modifier.size(24.dp), tint = Blue)
+        Text(label, color = Blue, fontSize = 13.sp, maxLines = 1)
+    }
 
 // known/connected passed in: BleHub isn't snapshot state, so the row would skip the 1 s tick.
 @Composable

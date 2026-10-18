@@ -59,10 +59,12 @@ private fun Root(core: AppCore) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var session by rememberSaveable { mutableStateOf<String?>(null) }
-    BackHandler(settings || session != null) { settings = false; session = null }
+    var build by rememberSaveable { mutableStateOf(false) }   // the builder, pushed on settings
+    BackHandler(settings || session != null) { if (build) build = false else { settings = false; session = null } }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when {
-            settings -> SettingsScreen(core) { settings = false }
+            settings && build -> WorkoutBuilder(core.model.ftp, { build = false }) { core.train(it); build = false; settings = false; tab = 0 }
+            settings -> SettingsScreen(core, { settings = false }) { build = true }
             session != null -> SessionPage(core, session!!) { session = null }
             tab == 0 -> LiveScreen(core) { settings = true }
             else -> SessionsTab(core) { session = it }

@@ -5,6 +5,7 @@ import com.vibecode.orbeat.drivers.*
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Port of the Swift Tests folder: same vectors, same expectations. */
 class OrbeatTests {
@@ -244,5 +245,51 @@ class OrbeatTests {
         assertNull(Route.gpx("""<gpx><trk><trkseg><trkpt lat="1" lon="1"/><trkpt lat="1.01" lon="1"/></trkseg></trk></gpx>""".toByteArray(), "x"))
         assertEquals("fallback", Route.gpx("""<gpx><rte><rtept lat="1" lon="1"><ele>1</ele></rtept><rtept lat="1.01" lon="1"><ele>2</ele></rtept></rte></gpx>""".toByteArray(), "fallback")?.name)
         assertNull(Route.gpx("nope".toByteArray(), "x"))
+    }
+
+    @Test fun workout() {
+        val zwo = """
+            <workout_file><name>Over-Unders</name><workout>
+              <Warmup Duration="60" PowerLow="0.5" PowerHigh="1.0"/>
+              <SteadyState Duration="30" Power="0.8"/>
+              <FreeRide Duration="600"/>
+              <IntervalsT Repeat="2" OnDuration="10" OffDuration="20" OnPower="1.2" OffPower="0.4"/>
+              <Cooldown Duration="0" PowerLow="0.6" PowerHigh="0.3"/>
+            </workout></workout_file>
+        """.trimIndent()
+        val z = Workout.parse(zwo.toByteArray(), "zwo", "file", 200)!!
+        assertEquals("Over-Unders", z.name)
+        assertEquals(150.0, z.length, 0.0)   // FreeRide skipped
+        assertEquals(listOf(100, 150, 160, 240, 80, 240, null), listOf(0.0, 30.0, 75.0, 95.0, 110.0, 125.0, 150.0).map(z::watts))
+        val erg = "[COURSE HEADER]\nDESCRIPTION = 4x8 minutes at 105 percent\nUNITS = ENGLISH\nMINUTES WATTS\n[END COURSE HEADER]\n[COURSE DATA]\n" +
+            "0.00\t100\n1.00\t100\n1.00\t250\n2.00\t300\n[END COURSE DATA]\n"
+        val e = Workout.parse(erg.toByteArray(), "erg", "Sweet", 999)!!
+        assertEquals(listOf(100, 250, 275), listOf(30.0, 60.0, 90.0).map(e::watts))
+        assertEquals("Sweet", e.name)
+        assertEquals(120.0, e.length, 0.0)
+        assertEquals(200, Workout.parse(erg.replace("MINUTES WATTS", "MINUTES PERCENT").toByteArray(), "mrc", "x", 200)?.watts(30.0))
+        assertNull(Workout.parse("[COURSE DATA]\n[END COURSE DATA]".toByteArray(), "erg", "x", 200))
+        assertNull(Workout.parse("nope".toByteArray(), "zwo", "x", 200))
+        assertNull(Workout.parse("""<workout_file><workout><SteadyState Duration="0" Power="1"/></workout></workout_file>""".toByteArray(), "zwo", "x", 200))
+    }
+
+    // Builder: what it rides is what it exports.
+    @Test fun workoutPlan() {
+        var plan = WorkoutPlan.sample.copy(name = "A & <B>")
+        val ridden = plan.workout(250)
+        assertTrue("${ridden.steps.size} ${ridden.length}", ridden.steps.size == 9 && ridden.length == 3900.0)
+        assertEquals(listOf(125, 225, 138), listOf(0.0, 900.0, 1500.0).map(ridden::watts))
+        assertEquals(ridden, Workout.parse(plan.zwo.toByteArray(), "zwo", "x", 250))
+        assertEquals(148, (plan.intensity * 200).roundToInt())
+        assertEquals(67, plan.tss)
+        assertEquals(64, WorkoutPlan("s", listOf(WorkoutPlan.Block(WorkoutPlan.Kind.Steady, seconds = 3600, power = 0.8))).tss)
+        plan = plan.copy(name = "a]]>b")
+        assertEquals("a]]>b", Workout.parse(plan.zwo.toByteArray(), "zwo", "x", 250)?.name)
+        assertNull(WorkoutPlan.decode("""{"name":"x","blocks":[]}""")!!.ftp)
+        assertEquals(plan.copy(ftp = 230), WorkoutPlan.decode(plan.copy(ftp = 230).json))
+        assertEquals(2700, plan.blocks[2].asKind(WorkoutPlan.Kind.Steady).seconds)
+        assertEquals(300, plan.blocks[1].asKind(WorkoutPlan.Kind.Ramp).seconds)
+        assertEquals(listOf("a-b.zwo", "Workout.zwo", "Workout.zwo", "x.y.zwo"),
+            listOf("a/b", "", " .. ", " .x.y. ").map { plan.copy(name = it).fileName })
     }
 }

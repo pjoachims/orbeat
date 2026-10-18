@@ -26,6 +26,7 @@ import com.vibecode.orbeat.core.Route
 import com.vibecode.orbeat.core.SensorEvent
 import com.vibecode.orbeat.core.SessionClock
 import com.vibecode.orbeat.core.TrainerMode
+import com.vibecode.orbeat.core.Workout
 import com.vibecode.orbeat.core.now
 import java.io.File
 import java.net.HttpURLConnection
@@ -53,6 +54,9 @@ class AppCore(ctx: Context) {
     private var lastPush = 0.0
     private var routeAt: Double? = null
     private var lastGradeAt = 0.0
+    private var workoutAt: Double? = null
+    private var lastTarget: Int? = null
+    private var lastTargetAt = 0.0
     private var lastBuzz = 0.0
     /** An activity is on screen: alerts vibrate instead of notifying. */
     var foreground = false
@@ -125,6 +129,7 @@ class AppCore(ctx: Context) {
 
     /** Ride a route from its start (null = stop). The route only drives sim. */
     fun ride(r: Route?) {
+        if (r != null) model.workout = null
         model.route = r
         model.routeMeters = 0.0
         routeAt = null
@@ -133,13 +138,40 @@ class AppCore(ctx: Context) {
         else if (model.trainerControllable && !TrainerMode.Sim(0).sameKind(model.trainerMode)) setTrainer(TrainerMode.Sim(0))
     }
 
-    /** A GPX file (content:// from Files / share / picker) or orbeat://ride?gpx=<https URL>. */
+    /** Start a workout from its beginning (null = stop, ERG holds its target). A workout only drives ERG. */
+    fun train(w: Workout?) {
+        if (w != null && model.route != null) ride(null)
+        model.workout = w
+        model.workoutSeconds = 0.0
+        workoutAt = null
+        lastTarget = null
+        lastTargetAt = 0.0
+        if (w != null && model.trainerControllable && !TrainerMode.Erg(0).sameKind(model.trainerMode)) {
+            lastTarget = w.watts(0.0)
+            setTrainer(TrainerMode.Erg(lastTarget ?: model.ergWatts).clamped)
+        }
+    }
+
+    /** A GPX route or .zwo/.erg/.mrc workout (content:// from Files / share / picker) or orbeat://ride?gpx=<https URL>. */
     fun open(ctx: Context, uri: Uri) {
         val shown = runCatching {
             ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
         }.getOrNull()
-        val name = (shown ?: uri.lastPathSegment ?: "Route").substringAfterLast('/').removeSuffix(".gpx")
+        val file = (shown ?: uri.lastPathSegment ?: "Route").substringAfterLast('/')
+        val ext = file.substringAfterLast('.', "").lowercase()
+        val name = file.removeSuffix(".gpx")
         when {
+            (uri.scheme == "content" || uri.scheme == "file") && ext in Workout.extensions -> {
+                val data = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+                val w = data?.let { Workout.parse(it, ext, file.substringBeforeLast('.'), model.ftp) }
+                if (w == null) {
+                    recorder.log(mapOf("src" to "workout", "ev" to "rejected", "url" to uri.toString(), "bytes" to (data?.size ?: -1)))
+                    model.routeError = if (data == null) "Couldn't read $file." else "$file has no power targets to ride."
+                    return
+                }
+                recorder.log(mapOf("src" to "workout", "ev" to "loaded", "name" to w.name, "min" to w.length / 60, "steps" to w.steps.size))
+                train(w)
+            }
             uri.scheme == "content" || uri.scheme == "file" ->
                 load(runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull(), name, uri)
             uri.scheme == "orbeat" && uri.host == "ride" -> {
@@ -230,6 +262,7 @@ class AppCore(ctx: Context) {
         model.checkFresh()
         store.tick(model)
         followRoute()
+        followWorkout()
         pushState()
         alert()
     }
@@ -273,6 +306,27 @@ class AppCore(ctx: Context) {
             lastGradeAt = t
             setGrade(target)
         }
+    }
+
+    /**
+     * Workout mode, like a route: the clock runs while fresh power arrives;
+     * the ERG target goes out when it changes, at most once a second. A
+     * manual ±5 W holds until the next change. Paused outside ERG.
+     */
+    private fun followWorkout() {
+        val w = model.workout
+        if (w == null || model.trainerMode !is TrainerMode.Erg) { workoutAt = null; return }
+        val t = now()
+        val at = workoutAt
+        if (at != null && t - model.powerAt < RideModel.DIRECT_WINDOW) {
+            model.workoutSeconds = min(w.length, model.workoutSeconds + min(t - at, 5.0))
+        }
+        workoutAt = t
+        val target = w.watts(model.workoutSeconds) ?: return
+        if (target == lastTarget || t - lastTargetAt < 1) return
+        lastTarget = target
+        lastTargetAt = t
+        setTrainer(TrainerMode.Erg(target).clamped)
     }
 
     private fun pushState(force: Boolean = false) {

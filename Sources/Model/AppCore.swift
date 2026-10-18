@@ -15,6 +15,9 @@ final class AppCore: ObservableObject {
     private var lastPush = Date.distantPast
     private var routeAt: Date?
     private var lastGradeAt = Date.distantPast
+    private var workoutAt: Date?
+    private var lastTarget: Int?
+    private var lastTargetAt = Date.distantPast
 
     init() {
         #if targetEnvironment(simulator)
@@ -77,6 +80,7 @@ final class AppCore: ObservableObject {
     /// Start riding a route from its beginning (nil = stop). Switches the
     /// trainer to sim: the route only drives sim.
     func ride(_ r: Route?) {
+        if r != nil { model.workout = nil }
         model.route = r
         model.routeMeters = 0
         routeAt = nil
@@ -87,7 +91,23 @@ final class AppCore: ObservableObject {
         }
     }
 
-    /// A GPX file (Files, share sheet, Open panel) or orbeat://ride?gpx=<https URL>.
+    /// Start a workout from its beginning (nil = stop, ERG holds its target).
+    /// Switches the trainer to ERG: a workout only drives ERG.
+    func train(_ w: Workout?) {
+        if w != nil, model.route != nil { ride(nil) }
+        model.workout = w
+        model.workoutSeconds = 0
+        workoutAt = nil
+        lastTarget = nil
+        lastTargetAt = .distantPast
+        if let w, model.trainerControllable, !TrainerMode.erg(targetWatts: 0).sameKind(as: model.trainerMode) {
+            lastTarget = w.watts(at: 0)
+            setTrainer(TrainerMode.erg(targetWatts: lastTarget ?? model.ergWatts).clamped)
+        }
+    }
+
+    /// A GPX route or .zwo/.erg/.mrc workout (Files, share sheet, Open panel)
+    /// or orbeat://ride?gpx=<https URL>.
     func open(_ url: URL) {
         if url.isFileURL {
             let scoped = url.startAccessingSecurityScopedResource()
@@ -108,6 +128,17 @@ final class AppCore: ObservableObject {
 
     private func load(_ data: Data?, from url: URL) {
         let name = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension.lowercased()
+        if Workout.extensions.contains(ext) {
+            guard let w = data.flatMap({ Workout.parse($0, ext: ext, name: name, ftp: model.ftp) }) else {
+                recorder.log(["src": "workout", "ev": "rejected", "url": url.absoluteString, "bytes": data?.count ?? -1])
+                model.routeError = data == nil ? "Couldn't read \(url.lastPathComponent)."
+                                               : "\(url.lastPathComponent) has no power targets to ride."
+                return
+            }
+            recorder.log(["src": "workout", "ev": "loaded", "name": w.name, "min": w.length / 60, "steps": w.steps.count])
+            return train(w)
+        }
         guard let r = data.flatMap({ Route.gpx($0, name: name) }) else {
             recorder.log(["src": "route", "ev": "rejected", "url": url.absoluteString, "bytes": data?.count ?? -1])
             model.routeError = data == nil ? "Couldn't download or read \(url.lastPathComponent)."
@@ -198,6 +229,7 @@ final class AppCore: ObservableObject {
     private func tick() {
         store.tick(model)
         followRoute()
+        followWorkout()
         pushState()
     }
 
@@ -217,6 +249,23 @@ final class AppCore: ObservableObject {
             lastGradeAt = now
             setGrade(target)
         }
+    }
+
+    /// Workout mode, like a route: the clock runs while fresh power arrives;
+    /// the ERG target goes out when it changes, at most once a second. A
+    /// manual ±5 W holds until the next change. Paused outside ERG.
+    private func followWorkout() {
+        guard let w = model.workout, case .erg? = model.trainerMode else { workoutAt = nil; return }
+        let now = Date()
+        if let t = workoutAt, now.timeIntervalSince(model.powerAt) < RideModel.directWindow {
+            model.workoutSeconds = min(w.length, model.workoutSeconds + min(now.timeIntervalSince(t), 5))
+        }
+        workoutAt = now
+        guard let target = w.watts(at: model.workoutSeconds), target != lastTarget,
+              now.timeIntervalSince(lastTargetAt) >= 1 else { return }
+        lastTarget = target
+        lastTargetAt = now
+        setTrainer(TrainerMode.erg(targetWatts: target).clamped)
     }
 
     private func pushState(force: Bool = false) {

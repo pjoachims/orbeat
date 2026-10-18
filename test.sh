@@ -17,6 +17,8 @@ swiftc -O \
   Sources/Core/Curve.swift \
   Sources/Core/RoadSpeed.swift \
   Sources/Core/Route.swift \
+  Sources/Core/Workout.swift \
+  Sources/Core/WorkoutPlan.swift \
   Sources/Drivers/Standard/CyclingPower.swift \
   Sources/Drivers/Standard/FtmsIndoorBike.swift \
   Sources/Drivers/Standard/FtmsMachineStatus.swift \
@@ -32,6 +34,7 @@ swiftc -O \
   Tests/CurveTests.swift \
   Tests/RoadSpeedTests.swift \
   Tests/RouteTests.swift \
+  Tests/WorkoutTests.swift \
   Tests/main.swift \
   -o "$OUT/orbeat-tests"
 
