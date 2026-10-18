@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +52,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,7 +82,16 @@ fun SettingsScreen(core: AppCore, back: () -> Unit, build: () -> Unit) {
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { delay(1000); tick++ } }
     var scanAll by remember { mutableStateOf(false) }
-    DisposableEffect(Unit) { onDispose { ble?.setScanAll(false) } }
+    val up = core.upload
+    var token by remember { mutableStateOf(up.token) }
+    var auto by remember { mutableStateOf(up.auto) }
+    var status by remember { mutableStateOf("") }
+    fun saveToken() { if (token != up.token) up.token = token }
+    DisposableEffect(Unit) { onDispose {
+        ble?.setScanAll(false)
+        saveToken()
+        if (up.auto) up.run(core.store.past)
+    } }
     val pickRoute = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { back(); core.open(ctx, uri) }
     }
@@ -151,6 +163,20 @@ fun SettingsScreen(core: AppCore, back: () -> Unit, build: () -> Unit) {
         Section(footer = "Live heart rate and power in the notification shade; keeps Bluetooth running in the background.", rows = listOf {
             ToggleCell("Ride notification", core.rideNotification) { core.rideNotification = it }
         })
+        Section("Health backend", "Finished rides go to your own fitbit-air backend.", buildList {
+            add { FieldCell("https://…", up.url, KeyboardType.Uri) { up.url = it } }
+            add { FieldCell("Token", token, KeyboardType.Password, secret = true) { token = it } }
+            add { Cell {
+                Text("Test", Modifier.clickable { saveToken(); status = "Testing…"; up.test { status = it } }, color = Blue)
+                Text("Upload", Modifier.padding(start = 8.dp).clickable {
+                    saveToken(); status = "Uploading…"; up.run(core.store.past) { status = it }
+                }, color = Blue)
+                Spacer(Modifier.weight(1f))
+                Text("Auto")
+                IosSwitch(auto) { auto = it; up.auto = it }
+            } }
+            if (status.isNotEmpty()) add { Cell { Text(status, color = secondary) } }
+        })
         // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
         Section("Debug", rows = listOf(
             { ToggleCell("Log ride", core.recorder.recording) { core.recorder.recording = it } },
@@ -163,6 +189,19 @@ fun SettingsScreen(core: AppCore, back: () -> Unit, build: () -> Unit) {
             }) { Icon(Icons.Filled.Share, null, tint = Blue); Text("Share orbeat.jsonl", color = Blue) } },
         ))
         if (ble == null) Text("No Bluetooth on the emulator — showing a simulated ride.", Modifier.padding(16.dp), color = secondary)
+    }
+}
+
+/** One-line text entry, placeholder while empty. */
+@Composable
+private fun FieldCell(placeholder: String, value: String, type: KeyboardType, secret: Boolean = false, set: (String) -> Unit) = Cell {
+    var text by remember { mutableStateOf(value) }
+    Box(Modifier.weight(1f)) {
+        val style = TextStyle(fontSize = 17.sp, color = Color.White)
+        if (text.isEmpty()) Text(placeholder, style = style.copy(color = tertiary))
+        BasicTextField(text, { text = it; set(it) }, Modifier.fillMaxWidth(), singleLine = true, textStyle = style,
+            cursorBrush = SolidColor(Blue), keyboardOptions = KeyboardOptions(keyboardType = type, autoCorrectEnabled = false),
+            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None)
     }
 }
 
