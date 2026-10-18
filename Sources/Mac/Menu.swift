@@ -142,8 +142,8 @@ extension AppDelegate {
         alert.addButton(withTitle: "Cancel")
         NSApp.activate()
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        UserDefaults.standard.set(url.stringValue.trimmingCharacters(in: .whitespaces), forKey: RideUpload.urlKey)
-        RideUpload.token = token.stringValue.trimmingCharacters(in: .whitespaces)
+        UserDefaults.standard.set(url.stringValue, forKey: RideUpload.urlKey)
+        RideUpload.token = token.stringValue
         core.store.upload()
     }
 

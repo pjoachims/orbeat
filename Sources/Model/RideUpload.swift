@@ -10,8 +10,12 @@ enum RideUpload {
     static let urlKey = "rideUploadURL"
     private static let doneKey = "rideUploadDone"
     private static var busy = false
+    /// Sessions handed in while busy: sent after the running chain.
+    private static var again: [Session]?
 
-    static var url: String { UserDefaults.standard.string(forKey: urlKey) ?? "" }
+    static var url: String {
+        (UserDefaults.standard.string(forKey: urlKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     /// Bearer token, kept in the Keychain: it reads and writes the user's health data.
     static var token: String {
@@ -23,6 +27,7 @@ enum RideUpload {
             return String(decoding: data, as: UTF8.self)
         }
         set {
+            let newValue = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             SecItemDelete(query as CFDictionary)
             guard !newValue.isEmpty else { return }
             let item = query.merging([kSecValueData as String: Data(newValue.utf8)]) { $1 }
@@ -38,10 +43,12 @@ enum RideUpload {
         return e
     }()
 
-    /// Main thread. Sends one session at a time and stops at the first failure.
+    /// Main thread. Sends one session at a time; stops at the first failure except a 400
+    /// (a body the backend will never take), which is skipped so it can't block the rest.
     static func run(_ sessions: [Session]) {
+        if busy { again = sessions; return }
         let token = token
-        guard !busy, !token.isEmpty, let base = URL(string: url), base.scheme != nil else { return }
+        guard !token.isEmpty, let base = URL(string: url), base.scheme != nil else { return }
         let done = Set(UserDefaults.standard.stringArray(forKey: doneKey) ?? [])
         let todo = sessions.filter { !done.contains(key($0)) }
         guard !todo.isEmpty else { return }
@@ -50,7 +57,11 @@ enum RideUpload {
     }
 
     private static func send(_ todo: ArraySlice<Session>, to endpoint: URL, token: String) {
-        guard let s = todo.first else { busy = false; return }
+        guard let s = todo.first else {
+            busy = false
+            if let next = again { again = nil; run(next) }
+            return
+        }
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -59,11 +70,13 @@ enum RideUpload {
         URLSession.shared.dataTask(with: req) { _, response, error in
             DispatchQueue.main.async {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-                guard status == 200 else {
+                guard status == 200 || status == 400 else {
                     NSLog("Orbeat: ride upload failed: \(error?.localizedDescription ?? "HTTP \(status)")")
                     busy = false
+                    again = nil
                     return
                 }
+                if status == 400 { NSLog("Orbeat: ride \(s.id) rejected by backend, skipped") }
                 UserDefaults.standard.set((UserDefaults.standard.stringArray(forKey: doneKey) ?? []) + [key(s)],
                                           forKey: doneKey)
                 send(todo.dropFirst(), to: endpoint, token: token)
