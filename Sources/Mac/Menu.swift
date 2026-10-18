@@ -153,9 +153,12 @@ extension AppDelegate {
         url.placeholderString = "https://…"
         let token = NSSecureTextField(string: RideUpload.token)
         token.placeholderString = "Token"
-        let stack = NSStackView(views: [url, token])
-        stack.orientation = .vertical
-        stack.frame = NSRect(x: 0, y: 0, width: 320, height: 52)
+        // Plain frames: in an NSAlert accessory a stack view squeezes the fields to zero width.
+        url.frame = NSRect(x: 0, y: 30, width: 320, height: 22)
+        token.frame = NSRect(x: 0, y: 0, width: 320, height: 22)
+        let stack = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 52))
+        stack.addSubview(url)
+        stack.addSubview(token)
         let alert = NSAlert()
         alert.messageText = "Health Backend"
         alert.informativeText = "Finished rides go to your own fitbit-air backend."
