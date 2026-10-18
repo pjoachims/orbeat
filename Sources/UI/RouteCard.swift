@@ -71,3 +71,66 @@ struct ElevationProfile: View {
         }
     }
 }
+
+/// Workout mode: name, time, current target and the power profile with the
+/// ridden part filled in.
+struct WorkoutCard: View {
+    let workout: Workout
+    let seconds: Double
+    var padding: CGFloat = 12
+    let onStop: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Eyebrow(text: "Workout · \(workout.name)")
+                Spacer(minLength: 4)
+                Button(action: onStop) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Stop this workout")
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(clock(seconds)) / \(clock(workout.length))")
+                Spacer()
+                Text(workout.watts(at: seconds).map { "\($0) W" } ?? "Finished")
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .monospacedDigit()
+            WorkoutProfile(workout: workout, seconds: seconds)
+                .frame(height: 44)
+        }
+        .modifier(Tile(padding: padding))
+    }
+}
+
+struct WorkoutProfile: View {
+    let workout: Workout
+    let seconds: Double
+
+    var body: some View {
+        Canvas { ctx, size in
+            let total = max(1, workout.length)
+            let top = Double(max(1, workout.steps.map { max($0.from, $0.to) }.max() ?? 1))
+            func y(_ w: Int) -> CGFloat { size.height * (1 - CGFloat(Double(w) / top) * 0.9) }
+            var p = Path(), t = 0.0
+            p.move(to: CGPoint(x: 0, y: size.height))
+            for s in workout.steps {
+                p.addLine(to: CGPoint(x: size.width * t / total, y: y(s.from)))
+                t += s.seconds
+                p.addLine(to: CGPoint(x: size.width * t / total, y: y(s.to)))
+            }
+            p.addLine(to: CGPoint(x: size.width, y: size.height))
+            p.closeSubpath()
+            ctx.fill(p, with: .color(.primary.opacity(0.12)))
+            var done = ctx
+            done.clip(to: Path(CGRect(x: 0, y: 0, width: size.width * min(1, seconds / total), height: size.height)))
+            done.fill(p, with: .color(orbeatRed.opacity(0.55)))
+        }
+    }
+}

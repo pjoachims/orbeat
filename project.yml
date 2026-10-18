@@ -95,6 +95,9 @@ targets:
           - CFBundleTypeName: GPX route
             LSHandlerRank: Alternate
             LSItemContentTypes: [com.topografix.gpx]
+          - CFBundleTypeName: Workout
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.zwift.zwo, com.vibecode.orbeat.erg]
         UTImportedTypeDeclarations:
           - UTTypeIdentifier: com.topografix.gpx
             UTTypeDescription: GPX route
@@ -102,6 +105,16 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension: [gpx]
               public.mime-type: [application/gpx+xml]
+          - UTTypeIdentifier: com.zwift.zwo
+            UTTypeDescription: Zwift workout
+            UTTypeConformsTo: [public.xml]
+            UTTypeTagSpecification:
+              public.filename-extension: [zwo]
+          - UTTypeIdentifier: com.vibecode.orbeat.erg
+            UTTypeDescription: ERG / MRC workout
+            UTTypeConformsTo: [public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [erg, mrc]
     entitlements:
       path: ios/App/Orbeat.entitlements
       properties:

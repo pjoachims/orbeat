@@ -238,18 +238,19 @@ struct TrainerStepper: View {
         }
         .modifier(Tile(padding: padding))
     }
+}
 
-    private func stepButton(_ symbol: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .bold))
-                .frame(width: 36, height: 30)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.primary.opacity(0.1)))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+/// The trainer card's − / + button; also the workout builder's.
+func stepButton(_ symbol: String, _ action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+        Image(systemName: symbol)
+            .font(.system(size: 13, weight: .bold))
+            .frame(width: 36, height: 30)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(.primary.opacity(0.1)))
+            .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
 }
 
 /// "Linked to iPhone/Mac" capsule; hidden while the peer link is down.

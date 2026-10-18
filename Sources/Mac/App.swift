@@ -43,7 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let host = NSHostingController(rootView: VStack(spacing: 0) {
             HeartCard(model: model, compact: true,
                       onStep: { [weak self] in self?.applyRidePress([$0]) }, onSet: core.setTrainer,
-                      onStopRoute: { [weak self] in self?.core.ride(nil) })
+                      onStopRoute: { [weak self] in self?.core.ride(nil) },
+                      onStopWorkout: { [weak self] in self?.core.train(nil) })
             SessionBar(core: core, store: core.store, model: model, compact: true)
                 .padding([.horizontal, .bottom], 16)
         }
