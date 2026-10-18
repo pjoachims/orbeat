@@ -132,6 +132,7 @@ struct ContentView: View {
         // Route opens once the sheet is gone: an error alert can't present over it.
         .sheet(isPresented: $showDevices, onDismiss: { pendingRoute.map(core.open); pendingRoute = nil }) {
             SettingsSheet(ble: ble, model: model, recorder: recorder, setRider: core.setRider, openRoute: { pendingRoute = $0 },
+                          upload: { store.upload(report: $0) },
                           train: { core.train($0) },
                           vibrateEvery: $vibrateEvery,
                           island: Binding(get: { activity != nil },
@@ -229,6 +230,7 @@ struct SettingsSheet: View {
     @ObservedObject var recorder: Recorder
     let setRider: (Rider) -> Void
     let openRoute: (URL) -> Void
+    let upload: (((String) -> Void)?) -> Void
     let train: (Workout) -> Void
     @Binding var vibrateEvery: Int
     @Binding var island: Bool
@@ -236,6 +238,10 @@ struct SettingsSheet: View {
     @State private var tick = 0
     @State private var scanAll = false
     @State private var pickRoute = false
+    @AppStorage(RideUpload.urlKey) private var uploadURL = ""
+    @State private var uploadToken = RideUpload.token
+    @State private var uploadStatus = ""
+    @AppStorage(RideUpload.autoKey) private var uploadAuto = true
     @State private var build = false
     @Environment(\.dismiss) private var dismiss
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -325,6 +331,31 @@ struct SettingsSheet: View {
                 Section {
                     Toggle("Dynamic Island", isOn: $island)
                 }
+                Section(header: Text("Health backend"),
+                        footer: Text("Finished rides go to your own fitbit-air backend.")) {
+                    TextField("https://…", text: $uploadURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    SecureField("Token", text: $uploadToken)
+                    // Borderless: several buttons in one List row each keep their own tap.
+                    HStack(spacing: 20) {
+                        Button("Test") {
+                            saveToken()
+                            uploadStatus = "Testing…"
+                            RideUpload.test { uploadStatus = $0 }
+                        }
+                        Button("Upload") {
+                            saveToken()
+                            uploadStatus = "Uploading…"
+                            upload { uploadStatus = $0 }
+                        }
+                        Spacer()
+                        Toggle("Auto", isOn: $uploadAuto).fixedSize()
+                    }
+                    .buttonStyle(.borderless)
+                    if !uploadStatus.isEmpty { Text(uploadStatus).foregroundStyle(.secondary) }
+                }
                 // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
                 Section(header: Text("Debug")) {
                     Toggle("Log ride", isOn: $recorder.recording)
@@ -348,8 +379,16 @@ struct SettingsSheet: View {
                 dismiss()
             }
             .onReceive(timer) { _ in tick += 1 }
-            .onDisappear { ble?.setScanAll(false) }
+            .onDisappear {
+                ble?.setScanAll(false)
+                saveToken()
+                if uploadAuto { upload(nil) }
+            }
         }
+    }
+
+    private func saveToken() {
+        if uploadToken != RideUpload.token { RideUpload.token = uploadToken }
     }
 
     private var tileRadius: CGFloat { if #available(iOS 26, *) { 26 } else { 10 } }

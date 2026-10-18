@@ -174,7 +174,11 @@ final class SessionStore: ObservableObject {
     private func reload() {
         let all = FetchDescriptor<SessionRecord>(sortBy: [SortDescriptor(\.start, order: .reverse)])
         past = ((try? context.fetch(all)) ?? []).map(\.session)
+        if RideUpload.auto { RideUpload.run(past) }
     }
+
+    /// Retry unsent rides now, e.g. after the backend settings changed.
+    func upload(report: ((String) -> Void)? = nil) { RideUpload.run(past, report: report) }
 
     /// Moves the old sessions.json into SwiftData, then renames it (kept as a
     /// backup) so it is not imported twice — CloudKit can't dedupe by id. A
