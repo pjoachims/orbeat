@@ -292,4 +292,19 @@ class OrbeatTests {
         assertEquals(listOf("a-b.zwo", "Workout.zwo", "Workout.zwo", "x.y.zwo"),
             listOf("a/b", "", " .. ", " .x.y. ").map { plan.copy(name = it).fileName })
     }
+    @Test fun rideUpload() {
+        val s = com.vibecode.orbeat.model.Session("A1", 1_760_000_000.7, null,
+            listOf(com.vibecode.orbeat.model.Session.Sample(1.0, 120, null, 90, 30.5)))
+        val b = com.vibecode.orbeat.model.RideUpload.body(s)
+        assertEquals("2025-10-09T08:53:20Z", b.getString("start"))
+        assertFalse(b.has("end"))
+        val x = b.getJSONArray("samples").getJSONObject(0)
+        assertTrue(x.getInt("bpm") == 120 && !x.has("watts") && x.getDouble("kmh") == 30.5)
+        val held = com.vibecode.orbeat.model.RideUpload.parseHeld("""[{"id":"A1","samples":1},{"id":"B","samples":5},{"x":1}]""")
+        assertEquals(mapOf("A1" to 1, "B" to 5), held)
+        val resumed = s.copy(samples = s.samples + s.samples)
+        val other = s.copy(id = "C")
+        assertEquals(listOf("A1", "C"), com.vibecode.orbeat.model.RideUpload.todo(listOf(s, resumed, other), held).map { it.id })
+        assertTrue(com.vibecode.orbeat.model.RideUpload.todo(listOf(s), held).isEmpty())
+    }
 }

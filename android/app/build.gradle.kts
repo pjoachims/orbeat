@@ -11,8 +11,8 @@ android {
         applicationId = "com.vibecode.orbeat"
         minSdk = 33   // Android 13: the non-deprecated GATT write/notify APIs
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
     buildFeatures { compose = true }
     compileOptions {

@@ -48,6 +48,7 @@ class AppCore(ctx: Context) {
     val model = RideModel(prefs)
     val store = SessionStore(File(ctx.filesDir, "sessions.json"))
     val recorder = Recorder(File(ctx.getExternalFilesDir(null) ?: ctx.filesDir, "orbeat.jsonl"), prefs)
+    val upload = RideUpload(prefs)
     var ble: BleHub? = null; private set
     var peer: PeerClient? = null; private set
     private val main = Handler(Looper.getMainLooper())
@@ -76,6 +77,7 @@ class AppCore(ctx: Context) {
     }
 
     init {
+        if (upload.auto) upload.run(store.past)
         if (isEmulator) simulate() else {
             val ble = BleHub(ctx, recorder)
             ble.onEvent = ::handle
@@ -225,7 +227,11 @@ class AppCore(ctx: Context) {
     }
 
     fun stopSession() {
-        if (store.active != null) { store.stop(); pushState(force = true) }
+        if (store.active != null) {
+            store.stop()
+            pushState(force = true)
+            if (upload.auto) upload.run(store.past)
+        }
         else if (model.peer?.recording != null) peer?.send(PeerMessage.Command(PeerCommand.StopSession))
     }
 
