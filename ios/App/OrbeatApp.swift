@@ -128,7 +128,7 @@ struct ContentView: View {
         // Route opens once the sheet is gone: an error alert can't present over it.
         .sheet(isPresented: $showDevices, onDismiss: { pendingRoute.map(core.open); pendingRoute = nil }) {
             SettingsSheet(ble: ble, model: model, recorder: recorder, setRider: core.setRider, openRoute: { pendingRoute = $0 },
-                          upload: store.upload,
+                          upload: { store.upload(report: $0) },
                           vibrateEvery: $vibrateEvery,
                           island: Binding(get: { activity != nil },
                                           set: { $0 ? startActivity() : endActivity() }))
@@ -225,7 +225,7 @@ struct SettingsSheet: View {
     @ObservedObject var recorder: Recorder
     let setRider: (Rider) -> Void
     let openRoute: (URL) -> Void
-    let upload: () -> Void
+    let upload: (((String) -> Void)?) -> Void
     @Binding var vibrateEvery: Int
     @Binding var island: Bool
     // ponytail: 1s tick re-reads ble.discovered (not observable); fine for a settings sheet
@@ -234,6 +234,7 @@ struct SettingsSheet: View {
     @State private var pickRoute = false
     @AppStorage(RideUpload.urlKey) private var uploadURL = ""
     @State private var uploadToken = RideUpload.token
+    @State private var uploadStatus = ""
     @Environment(\.dismiss) private var dismiss
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -316,6 +317,12 @@ struct SettingsSheet: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     SecureField("Token", text: $uploadToken)
+                    Button("Upload Now") {
+                        if uploadToken != RideUpload.token { RideUpload.token = uploadToken }
+                        uploadStatus = "Uploading…"
+                        upload { uploadStatus = $0 }
+                    }
+                    if !uploadStatus.isEmpty { Text(uploadStatus).foregroundStyle(.secondary) }
                 }
                 // Same JSONL as the Mac app (one line per BLE packet, "t" ISO ms).
                 Section(header: Text("Debug")) {
@@ -339,7 +346,7 @@ struct SettingsSheet: View {
             .onDisappear {
                 ble?.setScanAll(false)
                 if uploadToken != RideUpload.token { RideUpload.token = uploadToken }
-                upload()
+                upload(nil)
             }
         }
     }

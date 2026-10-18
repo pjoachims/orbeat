@@ -45,20 +45,25 @@ enum RideUpload {
 
     /// Main thread. Sends one session at a time; stops at the first failure except a 400
     /// (a body the backend will never take), which is skipped so it can't block the rest.
-    static func run(_ sessions: [Session]) {
-        if busy { again = sessions; return }
+    /// `report` gets a one-line result for the UI.
+    static func run(_ sessions: [Session], report: ((String) -> Void)? = nil) {
+        if busy { again = sessions; report?("Upload already running"); return }
         let token = token
-        guard !token.isEmpty, let base = URL(string: url), base.scheme != nil else { return }
+        guard !token.isEmpty, let base = URL(string: url), base.scheme != nil else {
+            report?("Set URL and token first"); return
+        }
         let done = Set(UserDefaults.standard.stringArray(forKey: doneKey) ?? [])
         let todo = sessions.filter { !done.contains(key($0)) }
-        guard !todo.isEmpty else { return }
+        guard !todo.isEmpty else { report?("All \(sessions.count) rides already sent"); return }
         busy = true
-        send(todo[...], to: base.appendingPathComponent("rides"), token: token)
+        send(todo[...], to: base.appendingPathComponent("rides"), token: token, sent: 0, of: todo.count, report: report)
     }
 
-    private static func send(_ todo: ArraySlice<Session>, to endpoint: URL, token: String) {
+    private static func send(_ todo: ArraySlice<Session>, to endpoint: URL, token: String,
+                             sent: Int, of total: Int, report: ((String) -> Void)?) {
         guard let s = todo.first else {
             busy = false
+            report?("Sent \(sent) of \(total) rides")
             if let next = again { again = nil; run(next) }
             return
         }
@@ -71,7 +76,9 @@ enum RideUpload {
             DispatchQueue.main.async {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 guard status == 200 || status == 400 else {
-                    NSLog("Orbeat: ride upload failed: \(error?.localizedDescription ?? "HTTP \(status)")")
+                    let why = error?.localizedDescription ?? "HTTP \(status)"
+                    NSLog("Orbeat: ride upload failed: \(why)")
+                    report?("Failed: \(why) (\(sent) of \(total) sent)")
                     busy = false
                     again = nil
                     return
@@ -79,10 +86,12 @@ enum RideUpload {
                 if status == 400 { NSLog("Orbeat: ride \(s.id) rejected by backend, skipped") }
                 UserDefaults.standard.set((UserDefaults.standard.stringArray(forKey: doneKey) ?? []) + [key(s)],
                                           forKey: doneKey)
-                send(todo.dropFirst(), to: endpoint, token: token)
+                send(todo.dropFirst(), to: endpoint, token: token,
+                     sent: sent + (status == 200 ? 1 : 0), of: total, report: report)
             }
         }.resume()
     }
 
-    private static func key(_ s: Session) -> String { "\(s.id)/\(s.samples.count)" }
+    /// Per backend: pointing at a new URL sends everything again.
+    private static func key(_ s: Session) -> String { "\(url) \(s.id)/\(s.samples.count)" }
 }

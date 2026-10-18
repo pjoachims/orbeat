@@ -144,7 +144,12 @@ extension AppDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         UserDefaults.standard.set(url.stringValue, forKey: RideUpload.urlKey)
         RideUpload.token = token.stringValue
-        core.store.upload()
+        core.store.upload { result in
+            let done = NSAlert()
+            done.messageText = "Health Backend"
+            done.informativeText = result
+            done.runModal()
+        }
     }
 
     @objc func toggleDuckDBLog() {
