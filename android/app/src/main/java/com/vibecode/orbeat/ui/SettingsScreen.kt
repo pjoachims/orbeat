@@ -163,7 +163,7 @@ fun SettingsScreen(core: AppCore, back: () -> Unit, build: () -> Unit) {
         Section(footer = "Live heart rate and power in the notification shade; keeps Bluetooth running in the background.", rows = listOf {
             ToggleCell("Ride notification", core.rideNotification) { core.rideNotification = it }
         })
-        Section("Health backend", "Finished rides go to your own fitbit-air backend.", buildList {
+        Section("Health backend", "Finished rides are sent to your own server (POST <url>/rides).", buildList {
             add { FieldCell("https://…", up.url, KeyboardType.Uri) { up.url = it } }
             add { FieldCell("Token", token, KeyboardType.Password, secret = true) { token = it } }
             add { Cell {

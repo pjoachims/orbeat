@@ -147,7 +147,7 @@ extension AppDelegate {
         NSApp.terminate(nil)
     }
 
-    /// URL + token of the user's own fitbit-air backend; finished rides go there.
+    /// URL + token of the user's own health backend; finished rides go there.
     @objc func editBackend() {
         let url = NSTextField(string: RideUpload.url)
         url.placeholderString = "https://…"
@@ -161,7 +161,7 @@ extension AppDelegate {
         stack.addSubview(token)
         let alert = NSAlert()
         alert.messageText = "Health Backend"
-        alert.informativeText = "Finished rides go to your own fitbit-air backend."
+        alert.informativeText = "Finished rides are sent to your own server (POST <url>/rides)."
         alert.accessoryView = stack
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")

@@ -31,7 +31,6 @@ targets:
       - Sources/Drivers
       - Sources/UI
       - Sources/Recorder
-      - Sources/Fitbit
       - Sources/Mac
       - path: Resources/Orbeat.icns
         buildPhase: resources
