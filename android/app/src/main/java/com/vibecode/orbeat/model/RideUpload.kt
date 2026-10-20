@@ -20,7 +20,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Posts finished sessions to the user's own health backend (fitbit-air,
+ * Posts finished sessions to the user's own health backend (any server
  * `POST <url>/rides`), same contract as the Apple apps' RideUpload. Asks the
  * backend first (`GET <url>/rides`) and sends only sessions it lacks or holds
  * with another sample count (a resumed ride). Unsent ones wait for the next

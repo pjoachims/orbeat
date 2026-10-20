@@ -63,6 +63,24 @@ To start a route, open a `.gpx` file in Orbeat (from Files, AirDrop or a link) o
 
 Tested on a Wahoo KICKR CORE Zwift One. Other smart trainers that support the standard FTMS protocol should work too.
 
+## Send rides to your own server (optional)
+
+Orbeat can send every finished ride to a server you run, so your rides end up next to the rest of your health data. Enter its URL and a token in **Settings → Health backend** (Mac: right-click → **Health Backend…**). Leave it empty and nothing is sent.
+
+Your server needs two endpoints. Both get `Authorization: Bearer <token>`.
+
+- `GET <url>/rides` returns the rides you already have, as `[{"id": "…", "samples": 1234}, …]`. Orbeat only sends rides that are missing or that have a different sample count (a resumed ride), so the iPhone and Mac never send the same ride twice.
+- `POST <url>/rides` receives one ride as JSON:
+  ```json
+  {
+    "id": "6F1C…-UUID",
+    "start": "2026-10-20T07:30:00Z",
+    "end": "2026-10-20T08:15:00Z",
+    "samples": [{"t": 0, "bpm": 92, "watts": 140, "rpm": 85, "kmh": 28.4}, …]
+  }
+  ```
+  `t` is seconds since the start, at most one sample per second, with gaps where no sensor sent anything. Fields with no reading are left out. Answer `200` to accept the ride. `400` skips it, and any other answer stops the upload, which is retried with the next ride or app launch.
+
 ## For developers
 
 ```sh

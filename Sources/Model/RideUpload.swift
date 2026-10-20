@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-/// Posts finished sessions to the user's own health backend (fitbit-air,
+/// Posts finished sessions to the user's own health backend (any server
 /// `POST <url>/rides`). Asks the backend first (`GET <url>/rides`) and sends only
 /// sessions it lacks or holds with another sample count (a resumed ride), so the Mac and
 /// iPhone don't both send the same ride. Unsent ones (offline, no backend set

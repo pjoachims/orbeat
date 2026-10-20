@@ -332,7 +332,7 @@ struct SettingsSheet: View {
                     Toggle("Dynamic Island", isOn: $island)
                 }
                 Section(header: Text("Health backend"),
-                        footer: Text("Finished rides go to your own fitbit-air backend.")) {
+                        footer: Text("Finished rides are sent to your own server (POST <url>/rides).")) {
                     TextField("https://…", text: $uploadURL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
