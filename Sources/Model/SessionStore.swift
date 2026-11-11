@@ -74,6 +74,20 @@ final class SessionStore: ObservableObject {
 
     private let context: ModelContext
     private var remote: AnyCancellable?
+    /// Last time the running session was written to the store / sent to the backend.
+    private var savedAt = Date.distantPast
+    private var uploadedAt = Date.distantPast
+
+    /// The running session is written to the store this often, so a crash or
+    /// iOS killing the app loses at most this much; relaunch picks it back up.
+    static let checkpointEvery: TimeInterval = 60
+    /// ...and sent to the health backend this often while it records.
+    static let uploadEvery: TimeInterval = 300
+    /// A checkpoint older than this at launch is finished, not resumed.
+    static let resumeWithin: TimeInterval = 6 * 3600
+    /// Id of the session recording on THIS device (others' unfinished records sync in too).
+    private static let activeKey = "activeSessionID"
+    private static let activeSavedKey = "activeSessionSavedAt"
 
     /// Pre-SwiftData history, imported once per device.
     static let legacyURL = FileManager.default
@@ -101,6 +115,7 @@ final class SessionStore: ObservableObject {
         } catch { fatalError("SwiftData store: \(error)") }
         context = ModelContext(container)
         importLegacy()
+        restoreActive()
         reload()
         // Sessions recorded on the other device arrive via CloudKit import.
         remote = NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)
@@ -108,7 +123,11 @@ final class SessionStore: ObservableObject {
             .sink { [weak self] _ in self?.reload() }
     }
 
-    func start() { active = Session(start: Date()); elapsed = 0; clock = .running(since: Date()) }
+    func start() {
+        active = Session(start: Date()); elapsed = 0; clock = .running(since: Date())
+        UserDefaults.standard.set(active!.id.uuidString, forKey: Self.activeKey)
+        savedAt = Date(); uploadedAt = Date()
+    }
 
     /// Reopen a saved session: new samples continue its clock.
     func resume(_ s: Session) {
@@ -117,12 +136,15 @@ final class SessionStore: ObservableObject {
         active = s
         elapsed = s.duration
         clock = SessionClock.paused(elapsed: s.duration).resuming()
+        UserDefaults.standard.set(s.id.uuidString, forKey: Self.activeKey)
+        savedAt = Date(); uploadedAt = Date()
     }
 
     func setPaused(_ paused: Bool) {
         guard let c = clock, c.isPaused != paused else { return }
         clock = paused ? c.pausing() : c.resuming()
         elapsed = clock!.elapsed()
+        checkpoint()
     }
 
     func stop() {
@@ -130,10 +152,32 @@ final class SessionStore: ObservableObject {
         s.end = Date()
         active = nil
         clock = nil
+        UserDefaults.standard.removeObject(forKey: Self.activeKey)
         // Nothing sampled (accidental tap, no sensors): nothing to keep.
         if s.samples.isEmpty { return }
-        // A resumed session updates its record in place.
-        // ponytail: continued on both devices while unlinked, last save wins.
+        write(s)
+        save()
+    }
+
+    /// Writes the running session (end = nil) to the store now, and sends it
+    /// to the backend when `uploadEvery` has passed. Called from tick every
+    /// `checkpointEvery`, and by the app when it goes to the background.
+    func checkpoint() {
+        guard let s = active, !s.samples.isEmpty else { return }
+        let now = Date()
+        savedAt = now
+        write(s)
+        do { try context.save() } catch { NSLog("Orbeat: checkpoint failed: \(error)") }
+        UserDefaults.standard.set(now, forKey: Self.activeSavedKey)
+        if RideUpload.auto, now.timeIntervalSince(uploadedAt) >= Self.uploadEvery {
+            uploadedAt = now
+            RideUpload.run(past.filter { $0.id != s.id } + [s])
+        }
+    }
+
+    /// Insert or update the record for `s` (a resumed session updates in place).
+    /// ponytail: continued on both devices while unlinked, last save wins.
+    private func write(_ s: Session) {
         let id = s.id
         let match = FetchDescriptor<SessionRecord>(predicate: #Predicate { $0.id == id })
         if let r = try? context.fetch(match).first {
@@ -142,7 +186,28 @@ final class SessionStore: ObservableObject {
         } else {
             context.insert(SessionRecord(s))
         }
-        save()
+    }
+
+    /// The app died mid-session (crash, iOS killed it): pick the last
+    /// checkpoint back up and keep recording, the gap not counted. Too old →
+    /// close it at its last checkpoint instead.
+    private func restoreActive() {
+        let d = UserDefaults.standard
+        guard let raw = d.string(forKey: Self.activeKey), let id = UUID(uuidString: raw) else { return }
+        let match = FetchDescriptor<SessionRecord>(predicate: #Predicate { $0.id == id })
+        guard let r = try? context.fetch(match).first, r.end == nil else {
+            d.removeObject(forKey: Self.activeKey); return
+        }
+        let s = r.session
+        let last = d.object(forKey: Self.activeSavedKey) as? Date ?? s.start.addingTimeInterval(s.duration)
+        if Date().timeIntervalSince(last) > Self.resumeWithin {
+            r.end = last
+            d.removeObject(forKey: Self.activeKey)
+            do { try context.save() } catch { NSLog("Orbeat: closing stale session failed: \(error)") }
+            return
+        }
+        NSLog("Orbeat: resuming session \(id) after relaunch, \(s.samples.count) samples")
+        resume(s)
     }
 
     func delete(_ session: Session) {
@@ -164,6 +229,7 @@ final class SessionStore: ObservableObject {
         let s = Session.Sample(t: elapsed, bpm: live ? m.bpm : nil,
                                watts: m.displayWatts, rpm: m.displayCadence, kmh: m.displaySpeedKmh)
         if s.bpm != nil || s.watts != nil { active!.samples.append(s) }
+        if Date().timeIntervalSince(savedAt) >= Self.checkpointEvery { checkpoint() }
     }
 
     private func save() {
@@ -174,11 +240,14 @@ final class SessionStore: ObservableObject {
     private func reload() {
         let all = FetchDescriptor<SessionRecord>(sortBy: [SortDescriptor(\.start, order: .reverse)])
         past = ((try? context.fetch(all)) ?? []).map(\.session)
-        if RideUpload.auto { RideUpload.run(past) }
+        // The running session goes up on its own clock (checkpoint), not on every save.
+        if RideUpload.auto { RideUpload.run(past.filter { $0.id != active?.id }) }
     }
 
     /// Retry unsent rides now, e.g. after the backend settings changed.
-    func upload(report: ((String) -> Void)? = nil) { RideUpload.run(past, report: report) }
+    func upload(report: ((String) -> Void)? = nil) {
+        RideUpload.run(past.filter { $0.id != active?.id } + (active.map { [$0] } ?? []), report: report)
+    }
 
     /// Moves the old sessions.json into SwiftData, then renames it (kept as a
     /// backup) so it is not imported twice — CloudKit can't dedupe by id. A
