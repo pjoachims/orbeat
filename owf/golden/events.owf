@@ -1,0 +1,11 @@
+{"owf":"0.1","start":"2026-07-19T11:00:00Z","sport":"running","channels":{"hr":"bpm"}}
+{"t":0,"hr":95}
+{"t":0.5,"ev":"marker","x-note":"warmup done"}
+{"t":60,"ev":"lap"}
+{"t":61,"hr":150}
+{"t":120,"ev":"lap"}
+{"t":121,"ev":"pause"}
+{"t":150,"ev":"resume"}
+{"t":151,"hr":142}
+{"t":200,"ev":"custom_sensor_event"}
+{"t":201,"hr":140}

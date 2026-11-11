@@ -1,0 +1,10 @@
+{"owf":"0.1","start":"2026-07-19T08:30:12Z","sport":"cycling","channels":{"hr":"bpm","pwr":"W","cad":"rpm","lat":"deg","lon":"deg"},"source":{"app":"Orbeat","device":"Fitbit Charge 6"}}
+{"t":0,"hr":121,"pwr":250,"cad":88,"lat":52.5163,"lon":13.3777}
+{"t":1.02,"hr":122}
+{"t":2.0,"pwr":261,"cad":90}
+{"t":3.1,"hr":123,"pwr":258,"cad":89,"lat":52.5164,"lon":13.3779}
+{"t":63.5,"ev":"lap"}
+{"t":64.1,"hr":140,"pwr":280,"cad":92}
+{"t":120.0,"ev":"pause"}
+{"t":180.0,"ev":"resume"}
+{"t":181.0,"hr":133,"pwr":200,"cad":85}
