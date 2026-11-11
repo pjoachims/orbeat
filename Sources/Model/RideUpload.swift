@@ -5,8 +5,9 @@ import Security
 /// `POST <url>/rides`). Asks the backend first (`GET <url>/rides`) and sends only
 /// sessions it lacks or holds with another sample count (a resumed ride), so the Mac and
 /// iPhone don't both send the same ride. Unsent ones (offline, no backend set
-/// yet) go on the next store change or launch.
-/// ponytail: no retry timer; a failed upload waits for the next session or launch.
+/// yet) go on the next store change or launch. A session still recording is sent
+/// every few minutes by SessionStore.checkpoint, growing in place on the backend.
+/// ponytail: no retry timer for finished rides; a failed upload waits for the next checkpoint, session or launch.
 enum RideUpload {
     static let urlKey = "rideUploadURL"
     /// Upload on every store change and launch; off = only the manual Upload button.
@@ -103,7 +104,10 @@ enum RideUpload {
         req.httpMethod = "POST"
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? encoder.encode(s)
+        // A ride still recording goes up every few minutes; give it an end so far.
+        var body = s
+        if body.end == nil { body.end = s.start.addingTimeInterval(s.duration) }
+        req.httpBody = try? encoder.encode(body)
         URLSession.shared.dataTask(with: req) { _, response, error in
             DispatchQueue.main.async {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
