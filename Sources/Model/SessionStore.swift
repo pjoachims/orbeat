@@ -65,10 +65,20 @@ struct Session: Codable, Identifiable {
 /// entitlements, or stays local when the build has none or sync is off.
 /// ponytail: `past` decodes every session on each change; page it past ~500 sessions.
 final class SessionStore: ObservableObject {
-    @Published private(set) var active: Session?
+    /// Not @Published: a new sample every second would re-render every view
+    /// on the store, and the session charts redo their work over all samples
+    /// so far. tick publishes by hand, and only while `uiVisible`; start, stop
+    /// and pause publish through `clock`.
+    private(set) var active: Session?
     @Published private(set) var past: [Session] = []
     /// Elapsed seconds of the active session; ticks so the UI can show a clock.
-    @Published private(set) var elapsed: TimeInterval = 0
+    private(set) var elapsed: TimeInterval = 0
+    /// false while the iOS app is in the background. Rendering there anyway
+    /// grew with ride length until iOS killed the app ~75 min in (cpu usage:
+    /// 80 % over 60 s). Back in front, the UI catches up at once.
+    var uiVisible = true {
+        didSet { if uiVisible, !oldValue { objectWillChange.send() } }
+    }
     /// The active session's clock (nil = not recording here).
     @Published private(set) var clock: SessionClock?
 
@@ -229,6 +239,7 @@ final class SessionStore: ObservableObject {
         let s = Session.Sample(t: elapsed, bpm: live ? m.bpm : nil,
                                watts: m.displayWatts, rpm: m.displayCadence, kmh: m.displaySpeedKmh)
         if s.bpm != nil || s.watts != nil { active!.samples.append(s) }
+        if uiVisible { objectWillChange.send() }
         if Date().timeIntervalSince(savedAt) >= Self.checkpointEvery { checkpoint() }
     }
 

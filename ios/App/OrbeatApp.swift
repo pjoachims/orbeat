@@ -162,6 +162,7 @@ struct ContentView: View {
         // accepting updates that render nowhere.
         .onChange(of: scenePhase) { _, p in
             // iOS may kill a backgrounded app: save the running session first.
+            store.uiVisible = p != .background
             if p == .background { store.checkpoint() }
             guard p == .active, let a = activity, a.activityState != .active else { return }
             activity = nil
